@@ -187,7 +187,7 @@ def hidden_feature_estimator(
     else:
         dataloader = dl.test_dataloader(dataset_name, in_dataset_name, batch_size=100)
     model = dl.load_pre_trained_nn(nn_name, gpu)
-
+    #获取in-train数据集的隐藏特征，类似logits方法中的获取质心
     sample = get_hidden_features_sample(model, dataloader, gpu, cap)
     means = get_hidden_feat_sample_mean(sample)
     inv, cov = get_hidden_feat_cov_inv_matrix(sample, means, diag, *args, **kwargs)

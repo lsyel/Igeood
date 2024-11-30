@@ -12,7 +12,7 @@ def compute_metrics(
     out_scores: np.ndarray,
     recall_level: float = RECALL_LEVEL,
     fpr_only=False,
-    print_thr=False,
+    print_thr=True,
 ):
     """Compute evaluation metrics for a binary detection problem. The label to be detected is `1`.
 
@@ -161,7 +161,7 @@ def print_metrics_and_info(
     out_dataset_name="",
     method_name="",
     header=True,
-    save_flag=False,
+    save_flag=True,
     verbose=2,
 ):
     if verbose in [2, False]:

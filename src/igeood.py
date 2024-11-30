@@ -228,6 +228,7 @@ def igeoodwb_score(
         nn_name, in_dataset_name, True, None, per_class=per_class
     )
     if cov_matrix_in is None or sample_mean_in is None or rewrite:
+        #注意这里的倒数第三个参数，false，表示是datasetname的train数据集，
         hidden_feature_estimator(
             nn_name, in_dataset_name, batch_size, gpu, True, True, None
         )

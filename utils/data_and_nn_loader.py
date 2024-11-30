@@ -24,7 +24,8 @@ sys.path.append("{}/models/".format(ROOT))
 from utils.logger import logger
 from models.densenet import DenseNetBC100
 from models.resnet import ResNet34
-
+import models.myresnet as mr
+import utils.traffic_dataloader as td
 # Train set statistics
 transform_dict = dict()
 transform_dict["CIFAR10"] = (
@@ -36,6 +37,10 @@ transform_dict["CIFAR100"] = (
     (0.2673342, 0.2564384, 0.2761506),
 )
 transform_dict["SVHN"] = (
+    (0.4379793, 0.4439904, 0.4729508),
+    (0.1981116, 0.2011045, 0.1970895),
+)
+transform_dict["USTC_IN"] = (
     (0.4379793, 0.4439904, 0.4729508),
     (0.1981116, 0.2011045, 0.1970895),
 )
@@ -94,6 +99,11 @@ def load_train_dataset(name, transform_name, transform=transform_statistics):
             root="{}/datasets/SVHN".format(ROOT),
             split="train",
             download=True,
+            transform=transform(transform_name),
+        )
+    elif name.upper() == "USTC_IN":
+        return td.NetworkTrafficDataset(
+            csv_file="./datasets/USTC_IN/train.csv",  # 修改为实际的CSV路径
             transform=transform(transform_name),
         )
     else:
@@ -243,6 +253,16 @@ def load_test_dataset(name, transform_dataset, transform=transform_statistics):
 
     elif name.upper() == "RESNET_SVHN_ADV":
         return load_adv_dataset("resnet_svhn")
+    elif name.upper() == "USTC_IN":
+        return td.NetworkTrafficDataset(
+            csv_file="./datasets/USTC_IN/test.csv",  # 修改为实际的CSV路径
+            transform=transform(transform_dataset),
+        )
+    elif name.upper() == "USTC_OUT":
+        return td.NetworkTrafficDataset(
+            csv_file="./datasets/USTC_OUT/test.csv",  # 修改为实际的CSV路径
+            transform=transform(transform_dataset),
+        )
     else:
         return torchvision.datasets.ImageFolder(
             "{}/datasets/{}".format(ROOT, name),
@@ -337,6 +357,9 @@ def load_pre_trained_nn(nn_name, gpu=None):
         if "svhn" not in nn_name and "cifar" not in nn_name:
             return load_nn(nn_name, map_location)
         return load_nn_from_state_dict(nn_name, model, map_location)
+    elif "myresnet" in nn_name:
+        model = mr.SimpleFullyConnectedNet(mr.input_size, mr.hidden_size, mr.output_size).to(mr.device)
+        return load_nn_from_state_dict(nn_name, model, map_location)
     elif "resnet" in nn_name:
         model = ResNet34(num_c)
         return load_nn_from_state_dict(nn_name, model, map_location)
@@ -361,6 +384,8 @@ def save_model(model, PATH):
 
 
 def get_in_dataset_name(nn_name):
+    if nn_name == "myresnet_model":
+        return "USTC_IN"
     if "1" not in nn_name:
         return "SVHN"
     l = nn_name.split("1")
@@ -378,6 +403,8 @@ def get_nn_name(architecture, in_dataset_name):
             nn_name = "densenet100"
         else:
             nn_name = "densenet_svhn"
+    elif architecture.lower() == "myresnet":
+        nn_name = "myresnet_model"
     elif architecture.lower() == "resnet":
         nn_name = "{}_{}".format(architecture.lower(), in_dataset_name.lower())
     else:
@@ -393,6 +420,8 @@ def get_number_channels(dataset_name):
 
 def get_num_classes(dataset_name):
     dataset_name = dataset_name.upper()
+    if dataset_name == "USTC_IN":
+        return 5
     if "MNIST" in dataset_name or "SVHN" in dataset_name or "CIFAR10" == dataset_name:
         return 10
     else:
@@ -609,7 +638,8 @@ def get_feature_list(model, gpu):
     if gpu is not None:
         temp_x = torch.rand(2, 3, 32, 32).cuda()
     else:
-        temp_x = torch.rand(2, 3, 32, 32)
+        # temp_x = torch.rand(2, 3, 32, 32)
+        temp_x = torch.rand(2, 76)
     temp_x = Variable(temp_x)
     temp_list = model.feature_list(temp_x)[1]
     num_output = len(temp_list)
