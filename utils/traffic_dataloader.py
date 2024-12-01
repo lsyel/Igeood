@@ -44,8 +44,6 @@ class NetworkTrafficDataset(Dataset):
         self.scaler = StandardScaler()
         self.X = self.scaler.fit_transform(self.X)
 
-        # 如果有转换操作，应用它
-        self.transform = transform
 
     def __len__(self):
         """返回数据集的大小"""

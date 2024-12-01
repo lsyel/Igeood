@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Delete Folder",
+            "type": "shell",
+            "command": "rm -rf ${workspaceFolder}/tensors  && rm -rf ${workspaceFolder}/results/scores",
+            "problemMatcher": []
+        }
+    ]
+}

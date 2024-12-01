@@ -8,7 +8,7 @@
             "name": "eval",
             "type": "debugpy",
             "request": "launch",
-            "program": "/root/repos/Igeood/eval.py",
+            "program": "/root/repos/myigeood/Igeood/eval.py",
             "console": "integratedTerminal",
             "args": [
                 "igeood_plus","--nn","densenet","--in-dataset" ,"cifar10","--out-dataset" ,"textures","--temperature","5.3" ,"--epsilon","0"
@@ -17,11 +17,12 @@
             "name": "myeval",
             "type": "debugpy",
             "request": "launch",
-            "program": "/root/repos/Igeood/eval.py",
+            "program": "/root/repos/myigeood/Igeood/eval.py",
             "console": "integratedTerminal",
             "args": [
                 "igeood_plus","--nn","myresnet","--in-dataset" ,"USTC_IN","--out-dataset" ,"USTC_OUT","--temperature","1" ,"--epsilon","0"
-            ]
+            ],
+            "preLaunchTask": "Delete Folder"
         }
     ]
 }

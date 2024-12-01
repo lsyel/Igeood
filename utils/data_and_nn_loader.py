@@ -40,16 +40,14 @@ transform_dict["SVHN"] = (
     (0.4379793, 0.4439904, 0.4729508),
     (0.1981116, 0.2011045, 0.1970895),
 )
-transform_dict["USTC_IN"] = (
-    (0.4379793, 0.4439904, 0.4729508),
-    (0.1981116, 0.2011045, 0.1970895),
-)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def transform_statistics(dataset_name):
     dataset_name = dataset_name.upper()
+    if "USTC" in dataset_name:
+        return None
     return transforms.Compose(
         [
             transforms.ToTensor(),
@@ -421,7 +419,7 @@ def get_number_channels(dataset_name):
 def get_num_classes(dataset_name):
     dataset_name = dataset_name.upper()
     if dataset_name == "USTC_IN":
-        return 5
+        return mr.output_size
     if "MNIST" in dataset_name or "SVHN" in dataset_name or "CIFAR10" == dataset_name:
         return 10
     else:
