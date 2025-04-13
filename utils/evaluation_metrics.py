@@ -34,6 +34,8 @@ def compute_metrics(
     fpr_at_tpr = compute_fpr_tpr(tprs, fprs, recall_level)
     index = np.argmin([abs(recall_level - f) for f in tprs])
     thr = thresholds[index]
+    print("thr:",thr)
+
     if print_thr:
         print(thr)
     if fpr_only:

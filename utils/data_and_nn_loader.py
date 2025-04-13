@@ -261,6 +261,11 @@ def load_test_dataset(name, transform_dataset, transform=transform_statistics):
             csv_file="./datasets/USTC_OUT/test.csv",  # 修改为实际的CSV路径
             transform=transform(transform_dataset),
         )
+    elif name.upper() == "USTC_TRUE_TRAFFIC":
+        return td.NetworkTrafficDataset(
+            csv_file="./datasets/USTC_TRUE_TRAFFIC/test.csv",  # 修改为实际的CSV路径
+            transform=transform(transform_dataset),
+        )
     else:
         return torchvision.datasets.ImageFolder(
             "{}/datasets/{}".format(ROOT, name),
@@ -300,7 +305,7 @@ def test_dataloader(
     elif name == "resnet_svhn_adv":
         testset = load_adv_dataset("resnet_svhn", *args, **kwargs)
     elif "densenet" in name or "resnet" in name:
-        testset = load_adv_dataset(name.split("ADV")[-1], *args, **kwargs)
+        testset = load_adv_dataset(name.split("ADV")[-1], *args, **kwargs)        
     else:
         testset = load_test_dataset(name, transform_name, transform)
 

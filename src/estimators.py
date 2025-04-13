@@ -77,6 +77,7 @@ def logits_centroid_estimator(
 
 def get_hidden_features_sample(model, dataloader, gpu, cap=None):
     model.eval()
+    #仅仅是用随机变量，得到模型的特征图的“维度（尺寸？）”，下面才会根据不同的输入数据，得到不同的特征图
     feature_list = dl.get_feature_list(model, gpu)
     num_hidden_features = len(feature_list)
 

@@ -46,19 +46,22 @@ class WeightRegression(EnsembleMethod):
         self.__name__ = f"weight_regression"
         self.ignore_dim = ignore_dim
         self.recall_level = recall_level
-
+        self.x_test = None
+        self.y_pred_test = None
     def __call__(self, in_data: np.ndarray, out_data: np.ndarray, *args, **kwargs):
         in_data = in_data[:, self.ignore_dim :]
         out_data = out_data[:, self.ignore_dim :]
 
         # split
         x_train, y_train, x_test, y_test = self.split_data(in_data, out_data)
+        self.x_test = x_test
         # fit
         self.regressor.fit(x_train, y_train)
         logger.info(f"Coeficients: {self.regressor.coef_}")
 
         # predict
         y_pred_test = self.regressor.predict_proba(x_test)[:, 1]
+        self.y_pred_test = y_pred_test
         # evaluate
         if self.verbose:
             print(self.regressor.coef_)
@@ -69,9 +72,9 @@ class WeightRegression(EnsembleMethod):
             logger.info(
                 "test fpr: {:.4f}".format(self.scoring_obj(y_test, y_pred_test)),
             )
+        print(self.regressor.coef_)
         in_scores = y_pred_test[y_test == 1]
-        out_scores = y_pred_test[y_test == 0]
-
+        out_scores = y_pred_test[y_test == 0]        
         return in_scores, out_scores
 
     def split_data(self, data_in, data_out):

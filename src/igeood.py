@@ -117,7 +117,29 @@ def main(
         fw.close()
     else:
         out_scores = fm.load_score_file(nn_name, out_dataset_name, filename)
-
+    #计算in_socre每个元素，在各个维度
+    sum_in_scores=[]
+    for i in range(len(in_scores)):
+        sum_in_scores.append(sum(in_scores[i]))
+    #通过分位数（如95%分位数）直接截断
+    q_in=np.quantile(sum_in_scores,0.8)
+    print(q_in)
+    #计算sum_in_scores的平均值
+    average_sum_in_scores=sum(sum_in_scores)/len(sum_in_scores)
+    print(average_sum_in_scores)
+    #计算out_socre每个元素，在各个维度
+    sum_out_scores=[]
+    for i in range(len(out_scores)):
+        sum_out_scores.append(sum(out_scores[i]))
+    #计算sum_out_scores的平均值
+    average_sum_out_scores=sum(sum_out_scores)/len(sum_out_scores)
+    print(average_sum_out_scores)
+    #计算sum_out_scores中小于q_in的元素的比例
+    count=0
+    for i in range(len(sum_out_scores)):
+        if sum_out_scores[i]<q_in:
+            count+=1
+    print(count/len(sum_out_scores))
     # Validation data
     if "val" in ensemble_method.__name__:
         val_dataset_name = ensemble_method.val_dataset_name
@@ -157,6 +179,27 @@ def main(
         in_scores, out_scores, val_scores
     )
 
+    
+    y_test=ensemble_method.regressor.predict_proba(ensemble_method.x_test)[:, 1]
+    print(y_test[:50])
+    print(ensemble_method.y_pred_test[:50])
+    ustc_true_traffic_dataset_name = "USTC_TRUE_TRAFFIC"
+    ustc_true_traffic_score = igeoodwb_score(
+            nn_name,
+            ustc_true_traffic_dataset_name,
+            batch_size,
+            gpu,
+            rewrite,
+            cov_mat_ood,
+            means_ood,
+            logits_flag,
+            temperature,
+            eps,
+            per_class=per_class,
+            distance=distance,
+        )
+    ustc_true_traffic_predict = ensemble_method.regressor.predict_proba(ustc_true_traffic_score)[:, 1]
+    print(ustc_true_traffic_predict[:50])
     if np.isnan(combine_in_score.max()) or np.isnan(combine_out_score.max()):
         logger.warning("nan value found in score, returning without evaluating")
         return
