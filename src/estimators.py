@@ -13,70 +13,6 @@ from src.measures import fisher_rao_logits_distance
 ROOT = dl.ROOT
 
 
-# def run_logits_centroid_estimator(
-#     nn_name, epochs=100, batch_size=128, gpu=None, lr=0.01, *args, **kwargs
-# ):
-#     model = dl.load_pre_trained_nn(nn_name, gpu)
-#     in_dataset_name = dl.get_in_dataset_name(nn_name)
-#     dataloader = dl.train_dataloader(
-#         in_dataset_name, in_dataset_name, batch_size=batch_size
-#     )
-#     logger.info("diagonal matrix initialization")
-#     init_tensor = torch.eye(dl.get_num_classes(in_dataset_name))
-#     distance = fisher_rao_logits_distance
-#     logits, targets = dl.pred_loop(model, dataloader, gpu)
-#     if gpu is not None:
-#         init_tensor = init_tensor.cuda(gpu)
-#         logits = logits.cuda(gpu)
-#         targets = targets.cuda(gpu)
-
-#     centroid, epoch_loss = logits_centroid_estimator(
-#         logits, targets, init_tensor, distance, epochs, lr, *args, **kwargs
-#     )
-#     # save tensor
-#     os.makedirs("{}/tensors".format(ROOT), exist_ok=True)
-#     filename = "{}/tensors/centroid_logits_{}_{}.pt".format(
-#         ROOT, nn_name, in_dataset_name
-#     )
-#     torch.save(centroid, filename)
-#     logger.info("first loss is approx {}".format(epoch_loss[0][0]))
-#     logger.info("last loss is approx {}".format(epoch_loss[0][-1]))
-#     return centroid, epoch_loss, logits, targets
-
-
-# def logits_centroid_estimator(
-#     logits, targets, init_tensor, distance, epochs, lr, *args, **kwargs
-# ):
-#     n_classes = init_tensor.shape[1]
-#     centroid = [
-#         Variable(init_tensor[i].reshape(1, -1), requires_grad=True)
-#         for i in range(n_classes)
-#     ]
-#     logger.info("Initialized centroid: {}".format(centroid))
-
-#     epoch_loss = [[] for _ in range(n_classes)]
-#     for epoch in range(epochs):
-#         for c in range(n_classes):
-#             filt = targets == c
-#             if filt.sum() == 0:
-#                 continue
-
-#             d = distance(logits[filt].detach(), centroid[c], *args, **kwargs)
-#             loss = torch.mean(d)
-#             epoch_loss[c].append(loss.item())
-#             loss.backward()
-#             # optimizer.step()
-#             with torch.no_grad():
-#                 aux = centroid[c]
-#                 tmp = aux - lr * aux.grad
-#                 centroid[c].copy_(tmp)
-
-#     logger.info("converged centroid: {}".format(centroid))
-#     return torch.vstack(centroid), epoch_loss
-
-
-
-from sklearn.cluster import KMeans
 def run_logits_centroid_estimator(
     nn_name, epochs=100, batch_size=128, gpu=None, lr=0.01, *args, **kwargs
 ):
@@ -85,134 +21,198 @@ def run_logits_centroid_estimator(
     dataloader = dl.train_dataloader(
         in_dataset_name, in_dataset_name, batch_size=batch_size
     )
-    logger.info("KMeans initialization for five centroids per class")
-    
+    logger.info("diagonal matrix initialization")
+    init_tensor = torch.eye(dl.get_num_classes(in_dataset_name))
+    distance = fisher_rao_logits_distance
     logits, targets = dl.pred_loop(model, dataloader, gpu)
     if gpu is not None:
+        init_tensor = init_tensor.cuda(gpu)
         logits = logits.cuda(gpu)
         targets = targets.cuda(gpu)
-    
-    n_classes = dl.get_num_classes(in_dataset_name)
-    n_centroids = 5  # 修改质心数量为5
-    init_tensors = []
-    
-    for c in range(n_classes):
-        mask = targets == c
-        logits_c = logits[mask]
-        
-        if logits_c.size(0) < n_centroids:
-            # 处理样本不足的情况
-            if logits_c.size(0) == 0:
-                # 使用全局统计信息生成随机质心
-                global_mean = logits.mean(dim=0)
-                global_std = logits.std(dim=0)
-                centroid = torch.randn(n_centroids, logits.shape[1], 
-                                      device=logits.device) * global_std + global_mean
-            else:
-                # 复制现有样本并添加多样性噪声
-                repeat_times = (n_centroids // logits_c.size(0)) + 1
-                centroid = logits_c.repeat(repeat_times, 1)[:n_centroids]
-                noise = torch.randn_like(centroid) * logits_c.std(dim=0) * 0.1
-                centroid += noise
-        else:
-            # 使用KMeans找五个质心
-            logits_np = logits_c.cpu().numpy()
-            kmeans = KMeans(n_clusters=n_centroids, random_state=0).fit(logits_np)
-            centroid = torch.tensor(kmeans.cluster_centers_, 
-                                   dtype=logits.dtype, 
-                                   device=logits.device)
-        
-        init_tensors.append(centroid)
-    
-    init_tensor = torch.stack(init_tensors)  # 形状变为 (n_classes, 5, feature_dim)
-    
+
     centroid, epoch_loss = logits_centroid_estimator(
-        logits, targets, init_tensor, fisher_rao_logits_distance, epochs, lr, *args, **kwargs
+        logits, targets, init_tensor, distance, epochs, lr, *args, **kwargs
     )
-    
+    # save tensor
     os.makedirs("{}/tensors".format(ROOT), exist_ok=True)
-    filename = "{}/tensors/centroid_logits_{}_{}_x5.pt".format(ROOT, nn_name, in_dataset_name)
+    filename = "{}/tensors/centroid_logits_{}_{}.pt".format(
+        ROOT, nn_name, in_dataset_name
+    )
     torch.save(centroid, filename)
+    logger.info("first loss is approx {}".format(epoch_loss[0][0]))
+    logger.info("last loss is approx {}".format(epoch_loss[0][-1]))
     return centroid, epoch_loss, logits, targets
 
 
 def logits_centroid_estimator(
     logits, targets, init_tensor, distance, epochs, lr, *args, **kwargs
 ):
-    n_classes, n_centroids, feature_dim = init_tensor.shape  # 现在n_centroids=5
-    centroid = []
-    
-    # 初始化每个类的5个质心
-    for c in range(n_classes):
-        centroid_c = [
-            torch.nn.Parameter(init_tensor[c, k].clone().view(-1), requires_grad=True)
-            for k in range(n_centroids)
-        ]
-        centroid.append(centroid_c)
-    
-    logger.info(f"Initialized centroids: {len(centroid)} classes, each with {n_centroids} centroids")
-    epoch_loss = [[[] for _ in range(n_centroids)] for _ in range(n_classes)]
-    
+    n_classes = init_tensor.shape[1]
+    centroid = [
+        Variable(init_tensor[i].reshape(1, -1), requires_grad=True)
+        for i in range(n_classes)
+    ]
+    logger.info("Initialized centroid: {}".format(centroid))
+
+    epoch_loss = [[] for _ in range(n_classes)]
     for epoch in range(epochs):
         for c in range(n_classes):
             filt = targets == c
             if filt.sum() == 0:
                 continue
+
+            d = distance(logits[filt].detach(), centroid[c], *args, **kwargs)
+            loss = torch.mean(d)
+            epoch_loss[c].append(loss.item())
+            loss.backward()
+            # optimizer.step()
+            with torch.no_grad():
+                aux = centroid[c]
+                tmp = aux - lr * aux.grad
+                centroid[c].copy_(tmp)
+
+    logger.info("converged centroid: {}".format(centroid))
+    return torch.vstack(centroid), epoch_loss
+
+
+
+# from sklearn.cluster import KMeans
+# def run_logits_centroid_estimator(
+#     nn_name, epochs=100, batch_size=128, gpu=None, lr=0.01, *args, **kwargs
+# ):
+#     model = dl.load_pre_trained_nn(nn_name, gpu)
+#     in_dataset_name = dl.get_in_dataset_name(nn_name)
+#     dataloader = dl.train_dataloader(
+#         in_dataset_name, in_dataset_name, batch_size=batch_size
+#     )
+#     logger.info("KMeans initialization for five centroids per class")
+    
+#     logits, targets = dl.pred_loop(model, dataloader, gpu)
+#     if gpu is not None:
+#         logits = logits.cuda(gpu)
+#         targets = targets.cuda(gpu)
+    
+#     n_classes = dl.get_num_classes(in_dataset_name)
+#     n_centroids = 5  # 修改质心数量为5
+#     init_tensors = []
+    
+#     for c in range(n_classes):
+#         mask = targets == c
+#         logits_c = logits[mask]
+        
+#         if logits_c.size(0) < n_centroids:
+#             # 处理样本不足的情况
+#             if logits_c.size(0) == 0:
+#                 # 使用全局统计信息生成随机质心
+#                 global_mean = logits.mean(dim=0)
+#                 global_std = logits.std(dim=0)
+#                 centroid = torch.randn(n_centroids, logits.shape[1], 
+#                                       device=logits.device) * global_std + global_mean
+#             else:
+#                 # 复制现有样本并添加多样性噪声
+#                 repeat_times = (n_centroids // logits_c.size(0)) + 1
+#                 centroid = logits_c.repeat(repeat_times, 1)[:n_centroids]
+#                 noise = torch.randn_like(centroid) * logits_c.std(dim=0) * 0.1
+#                 centroid += noise
+#         else:
+#             # 使用KMeans找五个质心
+#             logits_np = logits_c.cpu().numpy()
+#             kmeans = KMeans(n_clusters=n_centroids, random_state=0).fit(logits_np)
+#             centroid = torch.tensor(kmeans.cluster_centers_, 
+#                                    dtype=logits.dtype, 
+#                                    device=logits.device)
+        
+#         init_tensors.append(centroid)
+    
+#     init_tensor = torch.stack(init_tensors)  # 形状变为 (n_classes, 5, feature_dim)
+    
+#     centroid, epoch_loss = logits_centroid_estimator(
+#         logits, targets, init_tensor, fisher_rao_logits_distance, epochs, lr, *args, **kwargs
+#     )
+    
+#     os.makedirs("{}/tensors".format(ROOT), exist_ok=True)
+#     filename = "{}/tensors/centroid_logits_{}_{}_x5.pt".format(ROOT, nn_name, in_dataset_name)
+#     torch.save(centroid, filename)
+#     return centroid, epoch_loss, logits, targets
+
+
+# def logits_centroid_estimator(
+#     logits, targets, init_tensor, distance, epochs, lr, *args, **kwargs
+# ):
+#     n_classes, n_centroids, feature_dim = init_tensor.shape  # 现在n_centroids=5
+#     centroid = []
+    
+#     # 初始化每个类的5个质心
+#     for c in range(n_classes):
+#         centroid_c = [
+#             torch.nn.Parameter(init_tensor[c, k].clone().view(-1), requires_grad=True)
+#             for k in range(n_centroids)
+#         ]
+#         centroid.append(centroid_c)
+    
+#     logger.info(f"Initialized centroids: {len(centroid)} classes, each with {n_centroids} centroids")
+#     epoch_loss = [[[] for _ in range(n_centroids)] for _ in range(n_classes)]
+    
+#     for epoch in range(epochs):
+#         for c in range(n_classes):
+#             filt = targets == c
+#             if filt.sum() == 0:
+#                 continue
                 
-            logits_c = logits[filt].detach()  # (num_samples, feature_dim)
+#             logits_c = logits[filt].detach()  # (num_samples, feature_dim)
             
-            # 计算到所有5个质心的距离
-            dists = torch.stack([
-                distance(logits_c, centroid[c][k].unsqueeze(0), *args, **kwargs)
-                for k in range(n_centroids)
-            ], dim=1)  # 形状变为 (num_samples, 5)
+#             # 计算到所有5个质心的距离
+#             dists = torch.stack([
+#                 distance(logits_c, centroid[c][k].unsqueeze(0), *args, **kwargs)
+#                 for k in range(n_centroids)
+#             ], dim=1)  # 形状变为 (num_samples, 5)
             
-            assignments = dists.argmin(dim=1)  # 获取最近质心的索引
+#             assignments = dists.argmin(dim=1)  # 获取最近质心的索引
             
-            # 更新每个质心
-            for k in range(n_centroids):
-                mask = assignments == k
-                if mask.sum() == 0:
-                    # 动态调整：若连续5次无分配，随机重置
-                    if (epoch % 5 == 0) and (len(epoch_loss[c][k]) > 0):
-                        with torch.no_grad():
-                            centroid[c][k].data = logits[targets == c].mean(dim=0) + torch.randn_like(centroid[c][k]) * 0.1
-                    continue
+#             # 更新每个质心
+#             for k in range(n_centroids):
+#                 mask = assignments == k
+#                 if mask.sum() == 0:
+#                     # 动态调整：若连续5次无分配，随机重置
+#                     if (epoch % 5 == 0) and (len(epoch_loss[c][k]) > 0):
+#                         with torch.no_grad():
+#                             centroid[c][k].data = logits[targets == c].mean(dim=0) + torch.randn_like(centroid[c][k]) * 0.1
+#                     continue
                     
-                selected_logits = logits_c[mask]
-                centroid_tensor = centroid[c][k].unsqueeze(0)
+#                 selected_logits = logits_c[mask]
+#                 centroid_tensor = centroid[c][k].unsqueeze(0)
                 
-                # 计算损失
-                dist = distance(selected_logits, centroid_tensor, *args, **kwargs)
-                loss = torch.mean(dist)
+#                 # 计算损失
+#                 dist = distance(selected_logits, centroid_tensor, *args, **kwargs)
+#                 loss = torch.mean(dist)
                 
-                # 梯度更新
-                if centroid[c][k].grad is not None:
-                    centroid[c][k].grad.zero_()
-                loss.backward()
+#                 # 梯度更新
+#                 if centroid[c][k].grad is not None:
+#                     centroid[c][k].grad.zero_()
+#                 loss.backward()
                 
-                with torch.no_grad():
-                    centroid[c][k].data -= lr * centroid[c][k].grad.data
+#                 with torch.no_grad():
+#                     centroid[c][k].data -= lr * centroid[c][k].grad.data
                 
-                epoch_loss[c][k].append(loss.item())
+#                 epoch_loss[c][k].append(loss.item())
     
-    # 过滤无效质心（阈值设为总epoch数的1/3）
-    min_valid_epochs = epochs // 3
-    final_centroids = []
-    for c in range(n_classes):
-        valid_centroids = []
-        for k in range(n_centroids):
-            # 如果该质心更新次数达标则保留
-            if len(epoch_loss[c][k]) >= min_valid_epochs:
-                valid_centroids.append(centroid[c][k].detach())
+#     # 过滤无效质心（阈值设为总epoch数的1/3）
+#     min_valid_epochs = epochs // 3
+#     final_centroids = []
+#     for c in range(n_classes):
+#         valid_centroids = []
+#         for k in range(n_centroids):
+#             # 如果该质心更新次数达标则保留
+#             if len(epoch_loss[c][k]) >= min_valid_epochs:
+#                 valid_centroids.append(centroid[c][k].detach())
         
-        # 至少保留一个质心（优先保留第一个）
-        if not valid_centroids:
-            valid_centroids.append(centroid[c][0].detach())
+#         # 至少保留一个质心（优先保留第一个）
+#         if not valid_centroids:
+#             valid_centroids.append(centroid[c][0].detach())
         
-        final_centroids.append(torch.stack(valid_centroids))  # 形状 (有效质心数, 特征维度)
+#         final_centroids.append(torch.stack(valid_centroids))  # 形状 (有效质心数, 特征维度)
     
-    return torch.vstack(final_centroids), epoch_loss
+#     return torch.vstack(final_centroids), epoch_loss
 
 def get_hidden_features_sample(model, dataloader, gpu, cap=None):
     model.eval()
