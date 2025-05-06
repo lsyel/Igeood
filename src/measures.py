@@ -29,14 +29,23 @@ def fisher_rao_logits_distance(
 
 
 def igeoodlogits(logits, temperature, centroids, epsilon=1e-12, *args, **kwargs):
+    # 确保所有质心转移到logits所在的设备
+    centroids = [mu.to(logits.device) for mu in centroids]
+    
     d = [
         fisher_rao_logits_distance(
-            logits / temperature, mu.reshape(1, -1) / temperature, epsilon
+            logits / temperature, 
+            mu.reshape(1, -1).to(logits.device) / temperature,  # 显式转移mu到相同设备
+            epsilon
         ).reshape(-1, 1)
         for mu in centroids
     ]
     stack = torch.hstack(d)
-    return torch.sum(stack, 1)
+    ret = torch.sum(stack, 1)
+    #max
+    # ret = torch.max(stack, 1)[0]
+    return ret
+
 
 
 def min_igeoodlogits(logits, temperature, centroids, epsilon=1e-12, *args, **kwargs):

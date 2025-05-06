@@ -1,0 +1,29 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "eval",
+            "type": "debugpy",
+            "request": "launch",
+            // "python": "/root/miniconda3/envs/igeood",
+            "program": "/root/wzhdesign/Igeood/eval.py",
+            "console": "integratedTerminal",
+            "args": [
+                "igeood","--nn","densenet","--in-dataset" ,"cifar10","--out-dataset" ,"Imagenet_resize","--temperature","5.3" ,"--epsilon","0","-gpu","0"
+            ]
+        },        {
+            "name": "myeval",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/root/wzhdesign/Igeood/eval.py",
+            "console": "integratedTerminal",
+            "args": [
+                "igeoodlogits","--nn","myresnet","--in-dataset" ,"USTC_IN","--out-dataset" ,"USTC_OUT","--temperature","1" ,"--epsilon","0"
+            ],
+            "preLaunchTask": "Delete Folder"
+        }
+    ]
+}
