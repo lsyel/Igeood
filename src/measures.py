@@ -157,7 +157,57 @@ def igeoodfeature(
         )
 
     return torch.hstack(score)
-
+def multi_igeoodfeature(
+    out_feature,
+    sample_multi_mean,
+    cov1,
+    cov2,
+    layer_idx,
+    n_classes,
+    distance=fr_distance_multivariate_gaussian,
+):
+    batch_size = out_feature.shape[0]
+    score = []
+    
+    for i in range(n_classes):
+        if i not in sample_multi_mean[layer_idx]:
+            continue  # 跳过没有样本的类别
+            
+        # 获取当前类别的所有K个质心 [K, D]
+        centroids = sample_multi_mean[layer_idx][i]
+        K = centroids.shape[0]
+        
+        # 存储当前类别所有质心的得分
+        class_scores = []
+        
+        # 遍历每个质心
+        for k in range(K):
+            # 当前质心 [1, D]
+            centroid = centroids[k].unsqueeze(0)
+            
+            # 复制质心以匹配批次大小 [batch_size, D]
+            batch_centroid = centroid.expand(batch_size, -1)
+            
+            # 获取协方差矩阵（假设每个类共享一个协方差）
+            if isinstance(cov1[layer_idx], dict):
+                c1 = cov1[layer_idx][i]
+            else:
+                c1 = cov1[layer_idx]
+                
+            if isinstance(cov2[layer_idx], dict):
+                c2 = cov2[layer_idx][i]
+            else:
+                c2 = cov2[layer_idx]
+            
+            # 计算当前质心的距离 [batch_size]
+            dist = distance(out_feature, batch_centroid, c1, c2)
+            class_scores.append(dist)
+        
+        # 对K个质心的得分取平均 [batch_size]
+        avg_score = torch.mean(torch.stack(class_scores), dim=0)
+        score.append(avg_score)
+    
+    return torch.stack(score, dim=1)  # 输出形状 [batch_size, n_classes]
 
 def _igeood_layer_score(x, mus, cov_x, cov_mus):
     if type(mus) == dict:

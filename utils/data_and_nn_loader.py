@@ -639,6 +639,7 @@ def load_hidden_features_cov(
         logger.warn("file {} not found, returning".format(filename.split("/")[-1]))
         return
 
+    
 
 def load_hidden_features_inv(
     nn_name, dataset_name, diag=False, cap=None, per_class=False
@@ -675,6 +676,19 @@ def load_hidden_features_means(nn_name, dataset_name, cap=None):
         logger.warn("file {} not found, returning".format(filename.split("/")[-1]))
         return
 
+def load_hidden_features_multi_means(nn_name, dataset_name, cap=None):
+    cap_name = "_{}".format(cap) if cap is not None else ""
+    filename = "{}/tensors/{}/{}/hidden_features_multi_means{}.pt".format(
+        ROOT, nn_name, dataset_name, cap_name
+    )
+    if os.path.isfile(filename):
+        logger.info(
+            "loading multi means tensors from file {}".format(filename.split("/")[-1])
+        )
+        return torch.load(filename, map_location=DEVICE)
+    else:
+        logger.warn("file {} not found, returning".format(filename.split("/")[-1]))
+        return
 
 class LimitDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, nb_samples):

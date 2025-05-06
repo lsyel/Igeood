@@ -271,6 +271,38 @@ def get_hidden_feat_sample_mean(hidden_feature_sample):
 
     return sample_class_mean
 
+from sklearn.cluster import KMeans
+
+def multi_get_hidden_feat_sample_mean(hidden_feature_sample, n_clusters=5):
+    num_features = len(hidden_feature_sample)
+    sample_class_mean = {}
+
+    for i in range(num_features):
+        feature_dict = hidden_feature_sample[i]
+        sample_class_mean[i] = {}
+
+        for c, samples in feature_dict.items():
+            # 跳过空样本
+            if len(samples) == 0:
+                continue
+                
+            # 转换为 numpy 格式供 K-means 使用
+            samples_np = samples.cpu().numpy()
+            
+            # 执行 K-means 聚类
+            if len(samples_np) >= n_clusters:
+                kmeans = KMeans(n_clusters=n_clusters, random_state=0)
+                kmeans.fit(samples_np)
+                cluster_centers = kmeans.cluster_centers_  # 形状 [n_clusters, feature_dim]
+            else:
+                # 样本不足时直接使用所有样本作为"中心"
+                cluster_centers = samples_np
+
+            # 转换为 tensor 并保存
+            sample_class_mean[i][c] = torch.from_numpy(cluster_centers).float()
+
+    return sample_class_mean
+
 
 def get_hidden_feat_cov_inv_matrix(
     hidden_feature_sample, sample_class_mean, diag=False, eps=1e-6
@@ -330,7 +362,7 @@ def hidden_feature_estimator(
     sample = get_hidden_features_sample(model, dataloader, gpu, cap)
     means = get_hidden_feat_sample_mean(sample)
     inv, cov = get_hidden_feat_cov_inv_matrix(sample, means, diag, *args, **kwargs)
-
+    multi_means = multi_get_hidden_feat_sample_mean(sample, n_clusters=5)
     # Save hidden features means
     os.makedirs("{}/tensors/{}/{}".format(ROOT, nn_name, dataset_name), exist_ok=True)
     filename = "{}/tensors/{}/{}/hidden_features_means{}.pt".format(
@@ -338,7 +370,12 @@ def hidden_feature_estimator(
     )
     logger.info("saving file {}".format(filename))
     torch.save(means, filename)
-
+    filename = "{}/tensors/{}/{}/hidden_features_multi_means{}.pt".format(
+        ROOT, nn_name, dataset_name, cap_str
+    )
+    
+    logger.info("saving file {}".format(filename))
+    torch.save(multi_means, filename)
     mat_type = ""
     if diag:
         mat_type = "_diag"

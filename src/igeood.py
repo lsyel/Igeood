@@ -227,6 +227,9 @@ def igeoodwb_score(
     cov_matrix_in = dl.load_hidden_features_cov(
         nn_name, in_dataset_name, True, None, per_class=per_class
     )
+    multi_sample_mean_in = dl.load_hidden_features_multi_means(
+        nn_name, in_dataset_name
+    )
     if cov_matrix_in is None or sample_mean_in is None or rewrite:
         hidden_feature_estimator(
             nn_name, in_dataset_name, batch_size, gpu, True, True, None
@@ -235,7 +238,9 @@ def igeoodwb_score(
             nn_name, in_dataset_name, True, None, per_class=per_class
         )
         sample_mean_in = dl.load_hidden_features_means(nn_name, in_dataset_name)
-
+        multi_sample_mean_in = dl.load_hidden_features_multi_means(
+            nn_name, in_dataset_name
+        )
     if cov_mat_ood is not None:
         if cov_mat_ood == "ADV":
             cov_mat_ood += nn_name
@@ -314,6 +319,7 @@ def igeoodwb_score(
         eps,
         in_dataset_name,
         logits_centroids,
+        multi_sample_mean_in,
         distance=distance,
     )
 
@@ -332,6 +338,7 @@ def igeoodwb(
     eps=None,
     in_dataset_name=None,
     centroid_logits=None,
+    multi_sample_mean_in=None,
     distance=fr_distance_multivariate_gaussian,
 ):
     t0 = time.time()
@@ -379,15 +386,26 @@ def igeoodwb(
                 out_feature = torch.mean(out_feature, 2)
 
                 # Compute Fisher-Rao score
-                score1 = igeoodfeature(
-                    out_feature,
-                    sample_mean_in,
-                    cov_mat_in,
-                    cov_mat_in,
-                    layer_idx,
-                    num_classes,
-                    distance=distance,
-                )
+                if multi_sample_mean_in is None:
+                    score1 = igeoodfeature(
+                        out_feature,
+                        sample_mean_in,
+                        cov_mat_in,
+                        cov_mat_in,
+                        layer_idx,
+                        num_classes,
+                        distance=distance,
+                    )
+                else:
+                    score1 = multi_igeoodfeature(
+                        out_feature,
+                        multi_sample_mean_in,
+                        cov_mat_in,
+                        cov_mat_in,
+                        layer_idx,
+                        num_classes,
+                        distance=distance,
+                    )
                 score1, _ = torch.min(score1, dim=1)
                 score1 = score1.detach().cpu().numpy().reshape(-1, 1)
 
