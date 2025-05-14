@@ -42,6 +42,12 @@ transform_dict["SVHN"] = (
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def ustc_transform():
+    return transforms.Compose([
+        transforms.Resize((32, 32)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+    ])
 
 def transform_statistics(dataset_name):
     dataset_name = dataset_name.upper()
@@ -95,6 +101,11 @@ def load_train_dataset(name, transform_name, transform=transform_statistics):
             split="train",
             download=True,
             transform=transform(transform_name),
+        )
+    elif name.upper() == "USTC":
+        return torchvision.datasets.ImageFolder(
+            "{}/datasets/USTC/train".format(ROOT),
+            transform=ustc_transform(),
         )
     else:
         return torchvision.datasets.ImageFolder(
@@ -243,6 +254,16 @@ def load_test_dataset(name, transform_dataset, transform=transform_statistics):
 
     elif name.upper() == "RESNET_SVHN_ADV":
         return load_adv_dataset("resnet_svhn")
+    elif name.upper() == "DENSENET_USTC":
+        return torchvision.datasets.ImageFolder(
+            "{}/datasets/USTC/test".format(ROOT),
+            transform=ustc_transform(),
+        )
+    elif name.upper() == "DENSENET_TRAFFIC_OUT":
+        return torchvision.datasets.ImageFolder(
+            "{}/datasets/Traffic_Out".format(ROOT),
+            transform=ustc_transform(),
+        )
     else:
         return torchvision.datasets.ImageFolder(
             "{}/datasets/{}".format(ROOT, name),
@@ -281,6 +302,10 @@ def test_dataloader(
         testset = load_adv_dataset("resnet_cifar100", *args, **kwargs)
     elif name == "resnet_svhn_adv":
         testset = load_adv_dataset("resnet_svhn", *args, **kwargs)
+    elif name == "USTC":
+        testset = load_test_dataset("densenet_USTC", transform_name, transform)
+    elif name == "densenet_traffic_out":
+        testset = load_test_dataset("densenet_traffic_out", transform_name, transform)
     elif "densenet" in name or "resnet" in name:
         testset = load_adv_dataset(name.split("ADV")[-1], *args, **kwargs)
     else:
@@ -334,6 +359,8 @@ def load_pre_trained_nn(nn_name, gpu=None):
     num_c = get_num_classes(get_in_dataset_name(nn_name))
     if "densenet" in nn_name:
         model = DenseNetBC100(num_c)
+        if "USTC" in nn_name:
+            return load_nn_from_state_dict(nn_name, model, map_location)
         if "svhn" not in nn_name and "cifar" not in nn_name:
             return load_nn(nn_name, map_location)
         return load_nn_from_state_dict(nn_name, model, map_location)
@@ -361,6 +388,8 @@ def save_model(model, PATH):
 
 
 def get_in_dataset_name(nn_name):
+    if "USTC" in nn_name:
+        return "USTC"
     if "1" not in nn_name:
         return "SVHN"
     l = nn_name.split("1")
@@ -372,7 +401,9 @@ def get_in_dataset_name(nn_name):
 
 def get_nn_name(architecture, in_dataset_name):
     if architecture.lower() == "densenet":
-        if "CIFAR10" == in_dataset_name.upper():
+        if "USTC" == in_dataset_name.upper():
+            nn_name = "densenet_USTC"
+        elif "CIFAR10" == in_dataset_name.upper():
             nn_name = "densenet10"
         elif "CIFAR100" == in_dataset_name.upper():
             nn_name = "densenet100"
@@ -393,6 +424,8 @@ def get_number_channels(dataset_name):
 
 def get_num_classes(dataset_name):
     dataset_name = dataset_name.upper()
+    if "USTC" in dataset_name:
+        return 8
     if "MNIST" in dataset_name or "SVHN" in dataset_name or "CIFAR10" == dataset_name:
         return 10
     else:
