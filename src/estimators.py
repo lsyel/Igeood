@@ -65,7 +65,7 @@ def logits_centroid_estimator(
             loss = torch.mean(d)
             epoch_loss[c].append(loss.item())
             loss.backward()
-            # optimizer.step()
+            # optimizer.step() todo修改下降方法
             with torch.no_grad():
                 aux = centroid[c]
                 tmp = aux - lr * aux.grad
@@ -346,48 +346,77 @@ def hidden_feature_estimator(
     *args,
     **kwargs
 ):
-    # test features
+    """隐藏层特征估计器
+    参数:
+        nn_name: 神经网络模型名称
+        dataset_name: 使用的数据集名称（默认为模型训练数据集）
+        batch_size: 数据加载的批大小
+        gpu: 使用的GPU ID（None表示使用CPU）
+        train: 是否使用训练数据集
+        diag: 是否使用对角协方差矩阵
+        cap: 采样数量上限（None表示不限制）
+    返回:
+        tuple: (均值, 协方差逆矩阵, 协方差矩阵)
+    """
+    # 生成文件后缀（用于带采样上限的情况）
     cap_str = "_{}".format(cap) if cap is not None else ""
+    # 获取模型对应的原始训练数据集名称
     in_dataset_name = dl.get_in_dataset_name(nn_name)
+    # 设置默认数据集名称
     if dataset_name is None:
         dataset_name = in_dataset_name
+    
+    # 选择训练/测试数据加载器
     if train:
         dataloader = dl.train_dataloader(
             dataset_name, in_dataset_name, batch_size=batch_size
         )
     else:
+        # 测试时使用固定batch_size=100
         dataloader = dl.test_dataloader(dataset_name, in_dataset_name, batch_size=100)
+    
+    # 加载预训练模型
     model = dl.load_pre_trained_nn(nn_name, gpu)
 
+    # 获取隐藏层特征样本
     sample = get_hidden_features_sample(model, dataloader, gpu, cap)
+    # 计算单聚类中心均值
     means = get_hidden_feat_sample_mean(sample)
+    # 计算协方差矩阵及其逆矩阵
     inv, cov = get_hidden_feat_cov_inv_matrix(sample, means, diag, *args, **kwargs)
+    # 计算多聚类中心均值（5个聚类中心）
     multi_means = multi_get_hidden_feat_sample_mean(sample, n_clusters=5)
-    # Save hidden features means
+    
+    # 创建保存目录
     os.makedirs("{}/tensors/{}/{}".format(ROOT, nn_name, dataset_name), exist_ok=True)
+    
+    # 保存单中心均值
     filename = "{}/tensors/{}/{}/hidden_features_means{}.pt".format(
         ROOT, nn_name, dataset_name, cap_str
     )
     logger.info("saving file {}".format(filename))
     torch.save(means, filename)
+    
+    # 保存多中心均值（5个聚类）
     filename = "{}/tensors/{}/{}/hidden_features_multi_means{}.pt".format(
         ROOT, nn_name, dataset_name, cap_str
     )
-    
     logger.info("saving file {}".format(filename))
     torch.save(multi_means, filename)
+    
+    # 处理协方差矩阵类型标记
     mat_type = ""
     if diag:
-        mat_type = "_diag"
+        mat_type = "_diag"  # 对角协方差矩阵标记
 
-    # Save hidden features inv cov
+    # 保存协方差逆矩阵
     filename = "{}/tensors/{}/{}/hidden_features{}_invs_cov{}.pt".format(
         ROOT, nn_name, dataset_name, mat_type, cap_str
     )
     logger.info("saving file {}".format(filename))
     torch.save(inv, filename)
 
-    # Save hidden feature cov
+    # 保存协方差矩阵
     filename = "{}/tensors/{}/{}/hidden_features{}_cov_mat{}.pt".format(
         ROOT, nn_name, dataset_name, mat_type, cap_str
     )
