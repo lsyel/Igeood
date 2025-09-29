@@ -24,7 +24,7 @@ sys.path.append("{}/models/".format(ROOT))
 from utils.logger import logger
 from models.densenet import DenseNetBC100
 from models.resnet import ResNet34
-
+from models.my_resnet.inc_model import IncModel
 # Train set statistics
 transform_dict = dict()
 transform_dict["CIFAR10"] = (
@@ -51,6 +51,8 @@ def ustc_transform():
 
 def transform_statistics(dataset_name):
     dataset_name = dataset_name.upper()
+    if("USTC" in dataset_name.upper):
+        dataset_name = "USTC"
     return transforms.Compose(
         [
             transforms.ToTensor(),
@@ -105,6 +107,11 @@ def load_train_dataset(name, transform_name, transform=transform_statistics):
     elif name.upper() == "USTC":
         return torchvision.datasets.ImageFolder(
             "{}/datasets/USTC/train".format(ROOT),
+            transform=ustc_transform(),
+        )
+    elif name.upper() == "USTC_TASK_0_IN":
+        return torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_0_in/train".format(ROOT),
             transform=ustc_transform(),
         )
     else:
@@ -264,6 +271,16 @@ def load_test_dataset(name, transform_dataset, transform=transform_statistics):
             "{}/datasets/Traffic_Out".format(ROOT),
             transform=ustc_transform(),
         )
+    elif name.upper() == "TASK_1":
+        return torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_1_in/test".format(ROOT),
+            transform=ustc_transform(),
+        )
+    elif name == "ustc_task_0_in":
+        return torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_0_in/test".format(ROOT),
+            transform=ustc_transform(),
+        )
     else:
         return torchvision.datasets.ImageFolder(
             "{}/datasets/{}".format(ROOT, name),
@@ -357,6 +374,10 @@ def load_pre_trained_nn(nn_name, gpu=None):
     else:
         map_location = gpu
     num_c = get_num_classes(get_in_dataset_name(nn_name))
+    if "icarl" in nn_name:
+        model_path = "{}/pre_trained/task_{}_model.pth".format(ROOT, nn_name.split("_")[-1])
+        model = IncModel(model_path)
+        return model.model
     if "densenet" in nn_name:
         model = DenseNetBC100(num_c)
         if "USTC" in nn_name:
@@ -364,6 +385,7 @@ def load_pre_trained_nn(nn_name, gpu=None):
         if "svhn" not in nn_name and "cifar" not in nn_name:
             return load_nn(nn_name, map_location)
         return load_nn_from_state_dict(nn_name, model, map_location)
+
     elif "resnet" in nn_name:
         model = ResNet34(num_c)
         return load_nn_from_state_dict(nn_name, model, map_location)
@@ -388,6 +410,8 @@ def save_model(model, PATH):
 
 
 def get_in_dataset_name(nn_name):
+    if "icarl" in nn_name:
+        return "ustc_task_{}_in".format(int(nn_name.split("_")[-1]))
     if "USTC" in nn_name:
         return "USTC"
     if "1" not in nn_name:
@@ -414,8 +438,9 @@ def get_nn_name(architecture, in_dataset_name):
             nn_name = "resnet_USTC"
         else:
             nn_name = "{}_{}".format(architecture.lower(), in_dataset_name.lower())
-    else:
-        return
+    elif "icarl" in architecture:
+        num = in_dataset_name.split("_")[-1]
+        nn_name = "icarl_{}".format(num)
     return nn_name
 
 
@@ -427,8 +452,10 @@ def get_number_channels(dataset_name):
 
 def get_num_classes(dataset_name):
     dataset_name = dataset_name.upper()
+    if "TASK" in dataset_name:
+        return 5*(int(dataset_name.split("_")[2])+1)
     if "USTC" in dataset_name:
-        return 7
+        return 5
     if "MNIST" in dataset_name or "SVHN" in dataset_name or "CIFAR10" == dataset_name:
         return 10
     else:

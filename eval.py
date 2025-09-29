@@ -42,7 +42,7 @@ parser.add_argument(
     default="densenet",
     type=str,
     help="Neural network architecture",
-    choices=["densenet", "resnet", "densenet2"],
+    choices=["densenet", "resnet", "densenet2", "icarl"],
 )
 parser.add_argument(
     "-i",
@@ -50,7 +50,7 @@ parser.add_argument(
     default="CIFAR10",
     type=str,
     help="In-distribution dataset name",
-    choices=["CIFAR10", "cifar10", "CIFAR100", "cifar100", "SVHN", "svhn","USTC"],
+    choices=["CIFAR10", "cifar10", "CIFAR100", "cifar100", "SVHN", "svhn","USTC","task_0","task_1","task_2","task_3"],
 )
 parser.add_argument(
     "-o",
