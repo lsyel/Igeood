@@ -385,7 +385,7 @@ def hidden_feature_estimator(
     # 计算协方差矩阵及其逆矩阵
     inv, cov = get_hidden_feat_cov_inv_matrix(sample, means, diag, *args, **kwargs)
     # 计算多聚类中心均值（5个聚类中心）
-    multi_means = multi_get_hidden_feat_sample_mean(sample, n_clusters=5)
+    multi_means = multi_get_hidden_feat_sample_mean(sample, n_clusters=3)
     
     # 创建保存目录
     os.makedirs("{}/tensors/{}/{}".format(ROOT, nn_name, dataset_name), exist_ok=True)

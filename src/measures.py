@@ -212,9 +212,8 @@ def multi_igeoodfeature(
             dist = distance(out_feature, batch_centroid, c1, c2)
             class_scores.append(dist)
         
-        # 对K个质心的得分取平均 [batch_size]
-        avg_score = torch.mean(torch.stack(class_scores), dim=0)
-        score.append(avg_score)
+        min_score = torch.min(torch.stack(class_scores), dim=0)[0]
+        score.append(min_score)
     
     return torch.stack(score, dim=1)  # 输出形状 [batch_size, n_classes]
 

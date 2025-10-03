@@ -393,7 +393,7 @@ def igeoodwb(
 
             # 记录logits分数
             igeoodlogits_scores.extend(dist.detach().cpu().numpy().reshape(-1, 1))
-        multi_flag = False
+        multi_flag = True
         # === 隐藏层特征处理 ===
         with torch.no_grad():
             # 遍历每个隐藏层
