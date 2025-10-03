@@ -273,7 +273,7 @@ def get_hidden_feat_sample_mean(hidden_feature_sample):
 
 from sklearn.cluster import KMeans
 
-def multi_get_hidden_feat_sample_mean(hidden_feature_sample, n_clusters=5):
+def multi_get_hidden_feat_sample_mean(hidden_feature_sample, n_clusters=3):
     num_features = len(hidden_feature_sample)
     sample_class_mean = {}
 
@@ -291,7 +291,7 @@ def multi_get_hidden_feat_sample_mean(hidden_feature_sample, n_clusters=5):
             
             # 执行 K-means 聚类
             if len(samples_np) >= n_clusters:
-                kmeans = KMeans(n_clusters=n_clusters, random_state=0)
+                kmeans = KMeans(n_clusters=n_clusters, n_init='auto',random_state=0)
                 kmeans.fit(samples_np)
                 cluster_centers = kmeans.cluster_centers_  # 形状 [n_clusters, feature_dim]
             else:
