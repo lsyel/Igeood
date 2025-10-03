@@ -266,7 +266,7 @@ def igeoodwb_score(
             cov_val_dataset_name = cov_mat_ood + nn_name
             cap = None  # 不使用采样上限
         else:
-            cap = 1000  # 常规OOD数据集采样上限
+            cap = 3000  # 常规OOD数据集采样上限
             cov_val_dataset_name = cov_mat_ood
         
         logger.info(f"加载OOD协方差矩阵: {cov_val_dataset_name}")
@@ -393,10 +393,7 @@ def igeoodwb(
 
             # 记录logits分数
             igeoodlogits_scores.extend(dist.detach().cpu().numpy().reshape(-1, 1))
-        #todo:把cov_mat_in和cov_mat_out取平均值作为样本的协方差矩阵
-        cov_in_out_mean = {}
-        for i in range(len(cov_mat_in)):
-            cov_in_out_mean[i] = (cov_mat_in[i] + cov_mat_out[i]) / 2
+        multi_flag = False
         # === 隐藏层特征处理 ===
         with torch.no_grad():
             # 遍历每个隐藏层
@@ -404,16 +401,15 @@ def igeoodwb(
                 # 特征空间调整（展平后取均值）
                 out_feature = out_feature.reshape(out_feature.shape[0], out_feature.shape[1], -1)
                 out_feature = torch.mean(out_feature, 2)
-
                 # 计算Fisher-Rao分数（单/多聚类中心）
-                if multi_sample_mean_in is None:
-                    score1 = igeoodfeature(
-                        out_feature, sample_mean_in, cov_in_out_mean, cov_mat_in,
+                if multi_sample_mean_in is not None and multi_flag:
+                    score1 = multi_igeoodfeature(
+                        out_feature, multi_sample_mean_in, cov_mat_in, cov_mat_in,
                         layer_idx, num_classes, distance=distance
                     )
                 else:
-                    score1 = multi_igeoodfeature(
-                        out_feature, multi_sample_mean_in, cov_in_out_mean, cov_mat_in,
+                    score1 = igeoodfeature(
+                        out_feature, sample_mean_in, cov_mat_in, cov_mat_in,
                         layer_idx, num_classes, distance=distance
                     )
                 
@@ -424,7 +420,7 @@ def igeoodwb(
                 # OOD协方差矩阵处理（生成对比分数）
                 if cov_mat_out is not None:
                     score2 = igeoodfeature(
-                        out_feature, sample_mean_out, cov_in_out_mean, cov_mat_out,
+                        out_feature, sample_mean_out, cov_mat_in, cov_mat_out,
                         layer_idx, num_classes, distance=distance
                     )
                     score2, _ = torch.min(score2, dim=1)
