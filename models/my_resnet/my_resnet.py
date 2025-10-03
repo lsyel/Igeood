@@ -264,16 +264,6 @@ class ResNet(nn.Module):
             out = self.layer4(out)
         return out
 
-    def penultimate_forward(self, x):
-        out = F.relu(self.bn1(self.conv1(x)))
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        penultimate = self.layer4(out)
-        out = F.avg_pool2d(penultimate, 4)
-        out = out.view(out.size(0), -1)
-        y = self.linear(out)
-        return y, penultimate
 
 
 # ============= Model Builders =============

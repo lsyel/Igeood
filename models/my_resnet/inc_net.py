@@ -76,7 +76,7 @@ class IncrementalNet(BaseNet):
         super().__init__()
         self.use_moe = use_moe  # 👈 新增：是否使用 MoE
         self._cur_task = 0      # 👈 新增：记录当前任务 ID
-        self.fc = self.generate_fc(self.feature_dim, 5)
+        self.fc = self.generate_fc(self.feature_dim, 10)
     def update_fc(self, nb_classes):
         fc = self.generate_fc(self.feature_dim, nb_classes)
         if self.fc is not None:
@@ -120,62 +120,34 @@ class IncrementalNet(BaseNet):
                 self.convnet.moe_layer.expand_experts(task_id + 1)
         else:
             print("⚠️ MoE layer not found in convnet. Did you initialize with use_moe=True?")
+    def _forward_impl(self, x, task_id=None, routing_targets=None):
+        """
+        实际的前向计算实现，返回完整输出字典
+        """
+        # 使用MoE时传递task_id
+        conv_out = self.convnet(x)
+        
+        # 计算logits
+        logits = self.fc(conv_out["features"])['logits']
 
+        return logits
     def forward(self, x, task_id=None,routing_targets=None):
+        return self._forward_impl(x, task_id, routing_targets)
+
+    def feature_list(self, x):
         """
-        :param x: 输入图像
-        :param task_id: 可选，当前任务 ID，用于 MoE 路由控制
+        获取所有隐藏层特征（保持与训练时一致的处理流程）
         """
-        # 👇 传入 task_id 给 convnet（ResNet with MoE）
-        if self.use_moe:
-            x = self.convnet(x, task_id=task_id,routing_targets = routing_targets)
-        else:
-            x = self.convnet(x)
-
-        out = self.fc(x["features"])
-        out.update(x)  # 保留 fmaps, features 等
-
-
-        # 添加路由损失到输出
-        if "routing_loss" in x:
-            out["routing_loss"] = x["routing_loss"]
+        # 调用convnet的专用特征提取方法
+        features, out_list = self.convnet.feature_list(x)
         
-
-        return out['logits']
-    def feature_list(self,x):
-        out_list = []
-        out = F.relu(self.convnet.bn1(self.convnet.conv1(x)))
-        out_list.append(out)
-        out = self.convnet.layer1(out)
-        out_list.append(out)
-        out = self.convnet.layer2(out)
-        out_list.append(out)
-        out = self.convnet.layer3(out)
-        out_list.append(out)
-        out = self.convnet.layer4(out)
-        out_list.append(out)
-        pooled = F.avg_pool2d(out, 4)
-        features = pooled.view(pooled.size(0), -1)
+        # 计算logits（如果需要）
+        logits = self._forward_impl(x)
         
-        # 计算 logits（通过全连接层）
-        logits = self.fc(features)['logits']
-        
-        # 返回 logits 和特征列表（与原始接口一致）
         return logits, out_list
     def intermediate_forward(self, x, layer_index):
-        out = F.relu(self.convnet.bn1(self.convnet.conv1(x)))
-        if layer_index == 1:
-            out = self.convnet.layer1(out)
-        elif layer_index == 2:
-            out = self.convnet.layer1(out)
-            out = self.convnet.layer2(out)     
-        elif layer_index == 3:
-            out = self.convnet.layer1(out)
-            out = self.convnet.layer2(out)
-            out = self.convnet.layer3(out)
-        elif layer_index == 4:
-            out = self.convnet.layer1(out)
-            out = self.convnet.layer2(out)
-            out = self.convnet.layer3(out)
-            out = self.convnet.layer4(out)
-        return out
+        """
+        获取指定中间层特征
+        """
+        return self.convnet.intermediate_forward(x, layer_index)
+
