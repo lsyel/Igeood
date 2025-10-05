@@ -351,7 +351,11 @@ def igeoodwb(
     # 初始化分数存储结构
     igeoodfeature_scores = {i: [] for i in range(n_layers)}  # 各隐藏层特征分数
     igeoodlogits_scores = []  # logits特征分数
-
+    multi_flag = False
+    if multi_sample_mean_in is not None and multi_flag:
+        logger.debug("使用多聚类")
+    else:
+        logger.debug("不使用多聚类")
     # 遍历数据批次
     for batch_idx, data in enumerate(dataloader):
         # 处理输入数据（可能包含标签）
@@ -393,7 +397,6 @@ def igeoodwb(
 
             # 记录logits分数
             igeoodlogits_scores.extend(dist.detach().cpu().numpy().reshape(-1, 1))
-        multi_flag = True
         # === 隐藏层特征处理 ===
         with torch.no_grad():
             # 遍历每个隐藏层

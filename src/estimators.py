@@ -6,6 +6,7 @@ import sklearn.covariance
 import torch
 import utils.data_and_nn_loader as dl
 from torch.autograd import Variable
+from utils.kmeans import *
 from utils.logger import logger
 
 from src.measures import fisher_rao_logits_distance
@@ -271,37 +272,31 @@ def get_hidden_feat_sample_mean(hidden_feature_sample):
 
     return sample_class_mean
 
-from sklearn.cluster import KMeans
 
-def multi_get_hidden_feat_sample_mean(hidden_feature_sample, n_clusters=3):
+
+def multi_get_hidden_feat_sample_mean(hidden_feature_sample, max_clusters=5, n_jobs=4):
     num_features = len(hidden_feature_sample)
     sample_class_mean = {}
-
+    
     for i in range(num_features):
         feature_dict = hidden_feature_sample[i]
         sample_class_mean[i] = {}
-
-        for c, samples in feature_dict.items():
-            # 跳过空样本
-            if len(samples) == 0:
-                continue
-                
-            # 转换为 numpy 格式供 K-means 使用
-            samples_np = samples.cpu().numpy()
+        
+        # 安全处理空类别
+        if not feature_dict:
+            continue
             
-            # 执行 K-means 聚类
-            if len(samples_np) >= n_clusters:
-                kmeans = KMeans(n_clusters=n_clusters, n_init='auto',random_state=0)
-                kmeans.fit(samples_np)
-                cluster_centers = kmeans.cluster_centers_  # 形状 [n_clusters, feature_dim]
-            else:
-                # 样本不足时直接使用所有样本作为"中心"
-                cluster_centers = samples_np
-
-            # 转换为 tensor 并保存
-            sample_class_mean[i][c] = torch.from_numpy(cluster_centers).float()
-
+        # 并行处理每个类别
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(kmeans_precess_class)(c, samples, max_clusters)
+            for c, samples in feature_dict.items() if len(samples) > 0
+        )
+        
+        for c, centers in results:
+            sample_class_mean[i][c] = torch.from_numpy(centers).float()
+    
     return sample_class_mean
+
 
 
 def get_hidden_feat_cov_inv_matrix(
@@ -385,8 +380,10 @@ def hidden_feature_estimator(
     # 计算协方差矩阵及其逆矩阵
     inv, cov = get_hidden_feat_cov_inv_matrix(sample, means, diag, *args, **kwargs)
     # 计算多聚类中心均值（5个聚类中心）
-    multi_means = multi_get_hidden_feat_sample_mean(sample, n_clusters=3)
-    
+    multi_means = multi_get_hidden_feat_sample_mean(sample, max_clusters=10)
+    # 评估聚类质量
+    cluster_report = evaluate_clustering_quality(multi_means)
+    print_clustering_report(cluster_report)
     # 创建保存目录
     os.makedirs("{}/tensors/{}/{}".format(ROOT, nn_name, dataset_name), exist_ok=True)
     
