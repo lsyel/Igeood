@@ -50,7 +50,7 @@ parser.add_argument(
     default="CIFAR10",
     type=str,
     help="In-distribution dataset name",
-    choices=["CIFAR10", "cifar10", "CIFAR100", "cifar100", "SVHN", "svhn","USTC","task_0","task_1","task_2","task_3"],
+    choices=["CIFAR10", "cifar10", "CIFAR100", "cifar100", "SVHN", "svhn","USTC","ustc_task_0_in","ustc_task_0_out","ustc_task_1_in","ustc_task_1_out","ustc_task_2_in","ustc_task_2_out","ustc_task_3_in","ustc_task_3_out"],
 )
 parser.add_argument(
     "-o",

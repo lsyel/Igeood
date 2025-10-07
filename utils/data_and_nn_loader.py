@@ -125,6 +125,11 @@ def load_train_dataset(name, transform_name, transform=transform_statistics):
             "{}/datasets/ustc_task_0_in/train".format(ROOT),
             transform=train_cil_survey_transform(),
         )
+    elif name.upper() == "USTC_TASK_1_IN":
+        dataset = torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_1_in/train".format(ROOT),
+            transform=train_cil_survey_transform(),
+        )
     else:
         dataset = torchvision.datasets.ImageFolder(
             "{}/datasets/{}".format(ROOT, name),
@@ -292,9 +297,24 @@ def load_test_dataset(name, transform_dataset, transform=transform_statistics):
             "{}/datasets/ustc_task_1_in/test".format(ROOT),
             transform=ustc_transform(),
         )
-    elif name == "ustc_task_0_in":
+    elif name.upper() == "USTC_TASK_0_IN":
         dataset=  torchvision.datasets.ImageFolder(
             "{}/datasets/ustc_task_0_in/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_0_OUT":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_0_out/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_1_IN":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_1_in/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_1_OUT":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_1_out/test".format(ROOT),
             transform=test_cil_survey_transform(),
         )
     else:
@@ -396,7 +416,7 @@ def load_pre_trained_nn(nn_name, gpu=None):
     num_c = get_num_classes(get_in_dataset_name(nn_name))
     if "icarl" in nn_name:
         model_path = "{}/pre_trained/task_{}_model.pth".format(ROOT, nn_name.split("_")[-1])
-        model = IncModel(model_path)
+        model = IncModel(model_path, num_c)
         model.model.eval()
         return model.model
     if "densenet" in nn_name:
@@ -460,7 +480,7 @@ def get_nn_name(architecture, in_dataset_name):
         else:
             nn_name = "{}_{}".format(architecture.lower(), in_dataset_name.lower())
     elif "icarl" in architecture:
-        num = in_dataset_name.split("_")[-1]
+        num = in_dataset_name.split("_")[2]
         nn_name = "icarl_{}".format(num)
     return nn_name
 
