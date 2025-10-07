@@ -232,6 +232,12 @@ if __name__ == '__main__':
             'dataset': 'ustc_task_1_in',
             'transform': 'ustc_transform'
         },
+        {
+            'model_path': '/root/wzhdesign/Igeood/pre_trained/task_2_model.pth',
+            'num_classes': 15,
+            'dataset': 'ustc_task_2_in',
+            'transform': 'ustc_transform'
+        },
     ]
     for args in args_list:
         print(args)

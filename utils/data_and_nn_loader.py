@@ -130,6 +130,11 @@ def load_train_dataset(name, transform_name, transform=transform_statistics):
             "{}/datasets/ustc_task_1_in/train".format(ROOT),
             transform=train_cil_survey_transform(),
         )
+    elif name.upper() == "USTC_TASK_2_IN":
+        dataset = torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_2_in/train".format(ROOT),
+            transform=train_cil_survey_transform(),
+        )
     else:
         dataset = torchvision.datasets.ImageFolder(
             "{}/datasets/{}".format(ROOT, name),
@@ -315,6 +320,16 @@ def load_test_dataset(name, transform_dataset, transform=transform_statistics):
     elif name.upper() == "USTC_TASK_1_OUT":
         dataset=  torchvision.datasets.ImageFolder(
             "{}/datasets/ustc_task_1_out/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_2_IN":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_2_in/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_2_OUT":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_2_out/test".format(ROOT),
             transform=test_cil_survey_transform(),
         )
     else:
