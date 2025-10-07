@@ -474,7 +474,7 @@ def get_number_channels(dataset_name):
 def get_num_classes(dataset_name):
     dataset_name = dataset_name.upper()
     if "TASK" in dataset_name:
-        return 10*(int(dataset_name.split("_")[2])+1)
+        return 5*(int(dataset_name.split("_")[2])+1)
     if "USTC" in dataset_name:
         return 7
     if "MNIST" in dataset_name or "SVHN" in dataset_name or "CIFAR10" == dataset_name:

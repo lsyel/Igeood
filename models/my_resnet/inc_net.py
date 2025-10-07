@@ -76,7 +76,7 @@ class IncrementalNet(BaseNet):
         super().__init__()
         self.use_moe = use_moe  # 👈 新增：是否使用 MoE
         self._cur_task = 0      # 👈 新增：记录当前任务 ID
-        self.fc = self.generate_fc(self.feature_dim, 10)
+        self.fc = self.generate_fc(self.feature_dim, 5)
     def update_fc(self, nb_classes):
         fc = self.generate_fc(self.feature_dim, nb_classes)
         if self.fc is not None:

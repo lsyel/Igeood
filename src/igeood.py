@@ -341,6 +341,7 @@ def igeoodwb(
     centroid_logits=None,
     multi_sample_mean_in=None,
     distance=fr_distance_multivariate_gaussian,
+    last_layers=-1  # 新增参数，控制层选择策略
 ):
     """IGEOOD核心检测算法实现
 
@@ -363,24 +364,35 @@ def igeoodwb(
     t0 = time.time()
     length = len(dataloader)
     model.eval()  # 确保模型处于评估模式
-    n_layers = len(sample_mean_in)  # 获取隐藏层数量
-
-    # 初始化分数存储结构
-    igeoodfeature_scores = {i: [] for i in range(n_layers)}  # 各隐藏层特征分数
+    
+    # === 层选择策略 ===
+    n_layers = len(sample_mean_in)  # 获取总层数
+    
+    if last_layers == -1:
+        selected_layers = list(range(0, n_layers))
+    else:
+        selected_layers = list(range(n_layers-last_layers, n_layers))
+    logger.info(f"Selected layers: {selected_layers} (total layers: {n_layers})")
+    
+    # 初始化分数存储结构 - 只初始化选中的层
+    igeoodfeature_scores = {i: [] for i in selected_layers}  # 各隐藏层特征分数
     igeoodlogits_scores = []  # logits特征分数
-    multi_flag = False
+    multi_flag = True
     if multi_sample_mean_in is not None and multi_flag:
         logger.debug("使用多聚类")
     else:
         logger.debug("不使用多聚类")
+    
     # 遍历数据批次
     for batch_idx, data in enumerate(dataloader):
         # 处理输入数据（可能包含标签）
         if type(data) in [tuple, list]:
             data, _ = data  # 分离数据和标签
+        
         # 数据转移到GPU（如果可用）
         if gpu is not None:
             data = data.cuda()
+        
         # 设置需要梯度计算（用于对抗样本生成）
         data = Variable(data, requires_grad=True)
 
@@ -417,14 +429,19 @@ def igeoodwb(
             # 记录logits分数
             igeoodlogits_scores.extend(
                 dist.detach().cpu().numpy().reshape(-1, 1))
+        
         # === 隐藏层特征处理 ===
         with torch.no_grad():
-            # 遍历每个隐藏层
-            for layer_idx, out_feature in enumerate(out_features):
+            # 遍历每个选中的隐藏层
+            for layer_idx in selected_layers:
+                # 获取当前层特征
+                out_feature = out_features[layer_idx]
+                
                 # 特征空间调整（展平后取均值）
                 out_feature = out_feature.reshape(
                     out_feature.shape[0], out_feature.shape[1], -1)
                 out_feature = torch.mean(out_feature, 2)
+                
                 # 计算Fisher-Rao分数（单/多聚类中心）
                 if multi_sample_mean_in is not None and multi_flag:
                     score1 = multi_igeoodfeature(
@@ -449,11 +466,12 @@ def igeoodwb(
                     )
                     score2, _ = torch.min(score2, dim=1)
                     score2 = score2.detach().cpu().numpy().reshape(-1, 1)
+                    
                     # 合并两种分数
-                    igeoodfeature_scores[layer_idx].extend(
-                        np.hstack([score1, score2]))
+                    layer_scores = np.hstack([score1, score2])
+                    igeoodfeature_scores[layer_idx].append(layer_scores)
                 else:
-                    igeoodfeature_scores[layer_idx].extend(score1)
+                    igeoodfeature_scores[layer_idx].append(score1)
 
         # === 进度记录 ===
         if batch_idx % (int(length / 10) + 1) == 0 and batch_idx > 0:
@@ -465,13 +483,36 @@ def igeoodwb(
             t0 = time.time()  # 重置计时器
 
     # === 分数整合 ===
-    # 合并所有隐藏层分数
-    scores = np.hstack(
-        [np.asarray(igeoodfeature_scores[i], dtype=np.float32)
-         for i in range(n_layers)]
-    )
+    # 合并所有选中的隐藏层分数
+    scores_list = []
+    for layer_idx in selected_layers:
+        if igeoodfeature_scores[layer_idx]:  # 检查该层是否有分数
+            # 垂直堆叠该层的所有批次分数
+            layer_scores = np.vstack(igeoodfeature_scores[layer_idx])
+            
+            # 确保是2维数组（即使只有一列）
+            if layer_scores.ndim == 1:
+                layer_scores = layer_scores.reshape(-1, 1)
+            
+            scores_list.append(layer_scores)
+    
+    # 水平堆叠所有选中的层分数
+    if scores_list:
+        scores = np.hstack(scores_list)
+    else:
+        scores = np.array([])  # 空数组处理
+    
     # 合并logits分数（如果启用）
-    if logits_flag:
-        scores = np.hstack([scores, np.vstack(igeoodlogits_scores)])
+    if logits_flag and igeoodlogits_scores:
+        logits_scores = np.vstack(igeoodlogits_scores)
+        
+        # 确保logits分数是2维数组
+        if logits_scores.ndim == 1:
+            logits_scores = logits_scores.reshape(-1, 1)
+        
+        if scores.size > 0:
+            scores = np.hstack([scores, logits_scores])
+        else:
+            scores = logits_scores
 
     return scores
