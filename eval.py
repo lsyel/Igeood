@@ -7,6 +7,7 @@ from src.ensemble_method import AdvWeightRegression, WeightRegression
 from src.igeood import main as igeood_main
 from src.logits_benchmark import main as logits_main
 from src.mahalanobis import main as mahalanobis_main
+from src.mahalanobis_plus import main as mahalanobis_plus_main
 from utils.logger import logger
 
 parser = argparse.ArgumentParser(
@@ -31,6 +32,7 @@ parser.add_argument(
         "odin",
         "energy",
         "mahalanobis",
+        "mahalanobis_plus",
         "mahalanobis_adv",
         "kl_score_sum",
         "kl_score_min",
@@ -93,7 +95,7 @@ parser.add_argument(
 parser.add_argument(
     "-r",
     "--rewrite",
-    default=False,
+    default=True,
     type=bool,
     help="Re-calculate scores if true. If false, use available score files",
 )
@@ -170,6 +172,21 @@ if __name__ == "__main__":
                 batch_size,
                 gpu,
                 rewrite,
+            )
+        elif method == "mahalanobis_plus":
+            # Mahalanobis uses only the blocks' outputs
+            mahalanobis_plus_main(
+                WeightRegression(ignore_dim=1),
+                nn_name,
+                in_dataset_name,
+                out_dataset_name,
+                eps,
+                batch_size,
+                gpu,
+                rewrite,
+                use_ood=False,
+                ood_dataset_name=out_dataset_name,
+                ood_cap=3000,
             )
         elif method == "mahalanobis_adv":
             adv_set = dl.load_adv_dataset(nn_name)

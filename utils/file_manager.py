@@ -143,3 +143,9 @@ def remove_duplicates(filename):
     )
     df.to_csv(filename, index=False, header=True)
     logger.info("length reduced to {}".format(len(df)))
+def find_tensor_file(nn_name, dataset_name, filename):
+    """查找张量文件路径"""
+    path = os.path.join(ROOT, "tensors", nn_name, dataset_name, filename)
+    if os.path.isfile(path):
+        return path
+    return None

@@ -154,7 +154,7 @@ def train_dataloader(
     logger.info("dataset {} found. Preparing DataLoader".format(name))
     batch_size = kwargs.get("batch_size", 1)
     trainloader = torch.utils.data.DataLoader(
-        trainset, shuffle=False, num_workers=2, batch_size=batch_size
+        trainset, shuffle=True, num_workers=2, batch_size=batch_size
     )
     logger.info("dataset {} loaded with batch size {}".format(name, batch_size))
     return trainloader
@@ -361,7 +361,6 @@ def dataset_channel_statistics(dataloader: torch.utils.data.DataLoader, decimal=
 def test_dataloader(
     name, transform_name="CIFAR10", transform=transform_statistics, *args, **kwargs
 ):
-    shuffle = False
     if name == "densenet10_adv":
         testset = load_adv_dataset("densenet10", *args, **kwargs)
     elif name == "densenet100_adv":
@@ -385,7 +384,7 @@ def test_dataloader(
 
     batch_size = kwargs.get("batch_size", 1)
     testloader = torch.utils.data.DataLoader(
-        testset, shuffle=shuffle, num_workers=0, batch_size=batch_size
+        testset, shuffle=True, num_workers=0, batch_size=batch_size
     )
     logger.info("dataset {} loaded with batch size {}".format(name, batch_size))
     return testloader
