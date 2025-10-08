@@ -180,13 +180,11 @@ if __name__ == "__main__":
                 nn_name,
                 in_dataset_name,
                 out_dataset_name,
+                out_dataset_name,
                 eps,
                 batch_size,
                 gpu,
                 rewrite,
-                use_ood=False,
-                ood_dataset_name=out_dataset_name,
-                ood_cap=3000,
             )
         elif method == "mahalanobis_adv":
             adv_set = dl.load_adv_dataset(nn_name)
