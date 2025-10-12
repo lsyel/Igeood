@@ -21,6 +21,7 @@ def main(
     batch_size,
     gpu,
     rewrite=False,
+    ood_rate=0.05
 ):
     # Ensemble method
     mat_type = ""
@@ -42,7 +43,7 @@ def main(
     sample_mean = dl.load_hidden_features_means(nn_name, in_dataset_name)
     
     ood_sample_mean, ood_inverse, _ = hidden_feature_estimator_ood(
-        nn_name, ood_dataset_name,batch_size=10, gpu=gpu
+        nn_name, ood_dataset_name,batch_size=10, gpu=gpu,ood_rate=ood_rate
     )
 
     filename = "{}{}_{:.4f}.txt".format(prefix, mat_type, eps)

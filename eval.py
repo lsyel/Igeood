@@ -113,7 +113,13 @@ parser.add_argument(
     type=int,
     help="GPU index",
 )
-
+parser.add_argument(
+    "-rate",
+    "--ood_rate",
+    default=0.05,
+    type=float,
+    help="OOD cap rate",
+)
 if __name__ == "__main__":
     args = parser.parse_args()
     logger.info(args)
@@ -128,6 +134,7 @@ if __name__ == "__main__":
     rewrite = args.rewrite
     batch_size = args.batch_size
     gpu = args.gpu
+    ood_rate = args.ood_rate
 
     # multiple temperature and eps
     temperature_list = args.temperatures
@@ -185,6 +192,7 @@ if __name__ == "__main__":
                 batch_size,
                 gpu,
                 rewrite,
+                ood_rate,
             )
         elif method == "mahalanobis_adv":
             adv_set = dl.load_adv_dataset(nn_name)

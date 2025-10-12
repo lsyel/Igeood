@@ -318,6 +318,7 @@ def hidden_feature_estimator_ood(
     batch_size=10,
     gpu=None,
     diag=False,
+    ood_rate=0.05,
     *args,
     **kwargs
 ):
@@ -340,7 +341,7 @@ def hidden_feature_estimator_ood(
     dataloader = dl.test_dataloader(
         dataset_name, in_dataset_name, batch_size=batch_size)
     # 生成文件后缀（用于带采样上限的情况）
-    cap_rate = 0.01  # 采样上限比例
+    cap_rate = ood_rate  # 采样上限比例
     cap = int(len(dataloader)*batch_size*cap_rate)
     cap_str = "_{}".format(cap) if cap is not None else ""
     # 加载预训练模型
