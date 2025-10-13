@@ -1,9 +1,11 @@
 #!/bin/bash
 
 # 循环执行三次（0,1,2）
+echo "删除旧的tensors和results目录"
+rm -rf /root/wzhdesign/Igeood/tensors /root/wzhdesign/Igeood/results
 for i in {0..2}; do
     echo "-------- 开始执行任务 $i --------"
-    
+
     # 构建命令
     cmd="python /root/wzhdesign/Igeood/eval.py"
     cmd+=" mahalanobis"

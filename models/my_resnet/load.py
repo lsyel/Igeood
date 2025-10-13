@@ -77,7 +77,7 @@ def evaluate_model(model, dataloader, device):
     return accuracy
 
 def main(args):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda")
     logger.info(f"使用设备: {device}")
     
     # 1. 加载模型

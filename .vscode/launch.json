@@ -245,9 +245,9 @@
                 "--nn",
                 "icarl",
                 "--in-dataset",
-                "task_0",
+                "ustc_task_0",
                 "--out-dataset",
-                "task_1",
+                "ustc_task_1",
                 "--temperature",
                 "5.3",
                 "--epsilon",
@@ -255,7 +255,7 @@
                 "-gpu",
                 "0"
             ],
-            "preLaunchTask": "Delete Folder"
+            // "preLaunchTask": "Delete Folder"
         },
         {
             "name": "mahalanobis_icarl",
@@ -281,7 +281,7 @@
             "preLaunchTask": "Delete Folder"
         },
         {
-            "name": "mahalanobis_icarl_task_1",
+            "name": "mahalanobis_icarl_task_2",
             "type": "debugpy",
             "request": "launch",
             "program": "/root/wzhdesign/Igeood/eval.py",
@@ -291,9 +291,9 @@
                 "--nn",
                 "icarl",
                 "--in-dataset",
-                "ustc_task_1_in",
+                "ustc_task_2_in",
                 "--out-dataset",
-                "ustc_task_1_out",
+                "ustc_task_2_out",
                 "--temperature",
                 "5.3",
                 "--epsilon",
@@ -301,7 +301,30 @@
                 "-gpu",
                 "0"
             ],
-            "preLaunchTask": "Delete Folder"
+            // "preLaunchTask": "Delete Folder"
+        },
+        {
+            "name": "mahalanobis__plus_icarl_task_0",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/root/wzhdesign/Igeood/eval.py",
+            "console": "integratedTerminal",
+            "args": [
+                "mahalanobis_plus",
+                "--nn",
+                "icarl",
+                "--in-dataset",
+                "ustc_task_0_in",
+                "--out-dataset",
+                "ustc_task_0_out",
+                "--temperature",
+                "5.3",
+                "--epsilon",
+                "0",
+                "-gpu",
+                "0",
+            ],
+            // "preLaunchTask": "Delete Folder"
         },
     ]
 }

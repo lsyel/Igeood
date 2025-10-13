@@ -39,6 +39,7 @@ def main(
     fm.make_output_folders(nn_name, out_dataset_name)
 
     # Matrices - ID 统计量
+    hidden_feature_estimator(nn_name, in_dataset_name, batch_size, gpu, True)
     inverse = dl.load_hidden_features_inv(nn_name, in_dataset_name)
     sample_mean = dl.load_hidden_features_means(nn_name, in_dataset_name)
     

@@ -2,7 +2,8 @@
 
 # Mahalanobis的rate参数列表
 RATES=(0.01 0.05 0.1 0.15 0.2)
-
+echo "删除旧的tensors和results目录"
+rm -rf /root/wzhdesign/Igeood/tensors /root/wzhdesign/Igeood/results
 # 循环执行三次（0,1,2）
 for i in {0..2}; do
     echo "-------- 开始执行任务 $i --------"
@@ -10,7 +11,7 @@ for i in {0..2}; do
     # 遍历所有rate值
     for RATE in "${RATES[@]}"; do
         echo "执行任务 $i, rate=$RATE"
-        
+
         # 构建命令
         cmd="python /root/wzhdesign/Igeood/eval.py"
         cmd+=" mahalanobis_plus"
