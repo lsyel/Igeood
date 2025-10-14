@@ -6,13 +6,13 @@ import logging
 import sys
 
 class IncModel:
-    def __init__(self, model_path, num_classes, device="cuda"):
+    def __init__(self, model_path, device="cuda"):
         # 初始化日志系统
         self._setup_logging()
         self.logger = logging.getLogger('IncModel')
         
         self.device = device
-        self.model = self._load_model(model_path, num_classes)
+        self.model = self._load_model(model_path)
         self.model.eval()
     
     def _setup_logging(self):
@@ -39,13 +39,15 @@ class IncModel:
         
         logger.addHandler(console_handler)
     
-    def _load_model(self, model_path, num_classes):
+    def _load_model(self, model_path):
         self.logger.info(f"开始加载模型: {model_path}")
         checkpoint = torch.load(model_path, map_location=self.device)
-        moe_experts = checkpoint.get('moe_experts', 1)  # 默认为1
-
-        # 使用检测到的专家数量初始化模型
-        model = IncrementalNet(num_classes, use_moe=True, moe_experts=moe_experts)
+        
+        model = IncrementalNet(True)
+        
+        # 在加载前打印初始参数信息
+        # self.logger.info("\n加载前模型参数:")
+        # self._print_model_params(model)
         
         # 加载主网络参数
         model.load_state_dict(checkpoint['network_state_dict'])

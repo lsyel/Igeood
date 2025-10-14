@@ -7,7 +7,6 @@ from src.ensemble_method import AdvWeightRegression, WeightRegression
 from src.igeood import main as igeood_main
 from src.logits_benchmark import main as logits_main
 from src.mahalanobis import main as mahalanobis_main
-from src.mahalanobis_plus import main as mahalanobis_plus_main
 from utils.logger import logger
 
 parser = argparse.ArgumentParser(
@@ -32,7 +31,6 @@ parser.add_argument(
         "odin",
         "energy",
         "mahalanobis",
-        "mahalanobis_plus",
         "mahalanobis_adv",
         "kl_score_sum",
         "kl_score_min",
@@ -52,7 +50,7 @@ parser.add_argument(
     default="CIFAR10",
     type=str,
     help="In-distribution dataset name",
-    choices=["CIFAR10", "cifar10", "CIFAR100", "cifar100", "SVHN", "svhn","USTC","ustc_task_0_in","ustc_task_0_out","ustc_task_1_in","ustc_task_1_out","ustc_task_2_in","ustc_task_2_out","ustc_task_3_in","ustc_task_3_out"],
+    choices=["CIFAR10", "cifar10", "CIFAR100", "cifar100", "SVHN", "svhn","USTC","task_0","task_1","task_2","task_3"],
 )
 parser.add_argument(
     "-o",
@@ -95,7 +93,7 @@ parser.add_argument(
 parser.add_argument(
     "-r",
     "--rewrite",
-    default=True,
+    default=False,
     type=bool,
     help="Re-calculate scores if true. If false, use available score files",
 )
@@ -113,13 +111,7 @@ parser.add_argument(
     type=int,
     help="GPU index",
 )
-parser.add_argument(
-    "-rate",
-    "--ood_rate",
-    default=0.05,
-    type=float,
-    help="OOD cap rate",
-)
+
 if __name__ == "__main__":
     args = parser.parse_args()
     logger.info(args)
@@ -134,7 +126,6 @@ if __name__ == "__main__":
     rewrite = args.rewrite
     batch_size = args.batch_size
     gpu = args.gpu
-    ood_rate = args.ood_rate
 
     # multiple temperature and eps
     temperature_list = args.temperatures
@@ -179,20 +170,6 @@ if __name__ == "__main__":
                 batch_size,
                 gpu,
                 rewrite,
-            )
-        elif method == "mahalanobis_plus":
-            # Mahalanobis uses only the blocks' outputs
-            mahalanobis_plus_main(
-                WeightRegression(ignore_dim=1),
-                nn_name,
-                in_dataset_name,
-                out_dataset_name,
-                out_dataset_name,
-                eps,
-                batch_size,
-                gpu,
-                rewrite,
-                ood_rate,
             )
         elif method == "mahalanobis_adv":
             adv_set = dl.load_adv_dataset(nn_name)

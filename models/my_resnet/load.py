@@ -77,20 +77,19 @@ def evaluate_model(model, dataloader, device):
     return accuracy
 
 def main(args):
-    device = torch.device("cuda")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"使用设备: {device}")
     
     # 1. 加载模型
     model_path = args['model_path']
-    num_classes = args['num_classes']
-    dataset_name = args['dataset']
-    transform_name = args['transform']
     logger.info(f"加载模型: {model_path}")
-    model = IncModel(model_path, num_classes)
+    model = IncModel(model_path)
     model.model.to(device)
     model.model.eval()
     
-
+    # 2. 准备数据集
+    dataset_name = "ustc_task_0_in"
+    transform_name = "ustc_transform"
     
     logger.info(f"准备数据集: {dataset_name}")
     
@@ -218,27 +217,9 @@ def main(args):
         f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
         
         logger.info(f"{task_class_labels[i]:<15} | {precision:.4f} | {recall:.4f} | {f1:.4f}")
+
 if __name__ == '__main__':
-    args_list = [
-        {
-            'model_path': '/root/wzhdesign/Igeood/pre_trained/task_0_model.pth',
-            'num_classes': 5,
-            'dataset': 'ustc_task_0_in',
-            'transform': 'ustc_transform'
-        },
-        {
-            'model_path': '/root/wzhdesign/Igeood/pre_trained/task_1_model.pth',
-            'num_classes': 10,
-            'dataset': 'ustc_task_1_in',
-            'transform': 'ustc_transform'
-        },
-        {
-            'model_path': '/root/wzhdesign/Igeood/pre_trained/task_2_model.pth',
-            'num_classes': 15,
-            'dataset': 'ustc_task_2_in',
-            'transform': 'ustc_transform'
-        },
-    ]
-    for args in args_list:
-        print(args)
-        main(args)
+    args = {
+        'model_path': '/root/wzhdesign/Igeood/pre_trained/task_0_model.pth'
+    }
+    main(args)
