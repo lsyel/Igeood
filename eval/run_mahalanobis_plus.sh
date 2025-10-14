@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Mahalanobis的rate参数列表
-RATES=(0.01 0.05 0.1 0.15 0.2)
+RATES=(0.005 0.01 0.05 0.1 0.15 0.2)
 echo "删除旧的tensors和results目录"
 rm -rf /root/wzhdesign/Igeood/tensors /root/wzhdesign/Igeood/results
 # 循环执行三次（0,1,2）
