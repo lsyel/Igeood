@@ -264,6 +264,9 @@ def get_enhanced_mahalanobis_layer_score(
         # 取最小距离作为 ID 分数
         id_score_min, _ = torch.min(id_score, dim=1)
         id_score_min = id_score_min.detach().cpu().numpy().reshape(-1, 1)
+        # 取最大距离作为 ID 分数
+        id_score_max, _ = torch.max(id_score, dim=1)
+        id_score_max = id_score_max.detach().cpu().numpy().reshape(-1, 1)
         
         # 计算 OOD Mahalanobis 分数（使用 OOD 统计量）
         ood_score = compute_ood_distance(
@@ -272,8 +275,8 @@ def get_enhanced_mahalanobis_layer_score(
         ood_score = ood_score.detach().cpu().numpy().reshape(-1, 1)
         
         # 合并两种分数（与 IGEOOD 一致）
-        combined_score = np.hstack([id_score_min, ood_score])
-
+        # combined_score = np.hstack([id_score_min, ood_score])
+        combined_score = np.hstack([id_score_max, ood_score])
         if eps > 0:
             # Input_processing in the direction of the predicted class
             sample_pred = id_score.max(1)[1]
