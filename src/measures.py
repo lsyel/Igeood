@@ -72,6 +72,10 @@ def fr_distance_univariate_gaussian(
     Returns:
         torch.Tensor: Distance tensor of size (N,*)
     """
+    device = mu_1.device
+    sig_1 = sig_1.to(device)
+    mu_2 = mu_2.to(device)
+    sig_2 = sig_2.to(device)
     dim = len(mu_1.shape)
     mu_1, mu_2 = mu_1.reshape(*mu_1.shape, 1), mu_2.reshape(*mu_2.shape, 1)
     sig_1, sig_2 = sig_1.reshape(*sig_1.shape, 1), sig_2.reshape(*sig_2.shape, 1)
@@ -168,13 +172,16 @@ def multi_igeoodfeature(
 ):
     batch_size = out_feature.shape[0]
     score = []
-    
+    device = out_feature.device
+
     for i in range(n_classes):
         if i not in sample_multi_mean[layer_idx]:
             continue  # 跳过没有样本的类别
             
         # 获取当前类别的所有K个质心 [K, D]
         centroids = sample_multi_mean[layer_idx][i]
+        centroids = centroids.to(device)
+
         K = centroids.shape[0]
         
         # 存储当前类别所有质心的得分
@@ -193,19 +200,20 @@ def multi_igeoodfeature(
                 c1 = cov1[layer_idx][i]
             else:
                 c1 = cov1[layer_idx]
-                
+            c1 = c1.to(device)
+
             if isinstance(cov2[layer_idx], dict):
                 c2 = cov2[layer_idx][i]
             else:
                 c2 = cov2[layer_idx]
-            
+            c2 = c2.to(device)
+
             # 计算当前质心的距离 [batch_size]
             dist = distance(out_feature, batch_centroid, c1, c2)
             class_scores.append(dist)
         
-        # 对K个质心的得分取平均 [batch_size]
-        avg_score = torch.mean(torch.stack(class_scores), dim=0)
-        score.append(avg_score)
+        min_score = torch.min(torch.stack(class_scores), dim=0)[0]
+        score.append(min_score)
     
     return torch.stack(score, dim=1)  # 输出形状 [batch_size, n_classes]
 

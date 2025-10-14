@@ -7,6 +7,7 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.autograd import Variable
 import torch.utils.data
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 
 torch.manual_seed(0)
 
@@ -24,7 +25,7 @@ sys.path.append("{}/models/".format(ROOT))
 from utils.logger import logger
 from models.densenet import DenseNetBC100
 from models.resnet import ResNet34
-
+from models.my_resnet.inc_model import IncModel
 # Train set statistics
 transform_dict = dict()
 transform_dict["CIFAR10"] = (
@@ -48,7 +49,19 @@ def ustc_transform():
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     ])
+def train_cil_survey_transform():
+    return transforms.Compose([
+        transforms.Resize((32, 32)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+    ])
 
+def test_cil_survey_transform():
+    return transforms.Compose([
+        transforms.Resize((32, 32)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+    ])
 def transform_statistics(dataset_name):
     dataset_name = dataset_name.upper()
     return transforms.Compose(
@@ -103,15 +116,35 @@ def load_train_dataset(name, transform_name, transform=transform_statistics):
             transform=transform(transform_name),
         )
     elif name.upper() == "USTC":
-        return torchvision.datasets.ImageFolder(
+        dataset =  torchvision.datasets.ImageFolder(
             "{}/datasets/USTC/train".format(ROOT),
             transform=ustc_transform(),
         )
+    elif name.upper() == "USTC_TASK_0_IN":
+        dataset = torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_0_in/train".format(ROOT),
+            transform=train_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_1_IN":
+        dataset = torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_1_in/train".format(ROOT),
+            transform=train_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_2_IN":
+        dataset = torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_2_in/train".format(ROOT),
+            transform=train_cil_survey_transform(),
+        )
     else:
-        return torchvision.datasets.ImageFolder(
+        dataset = torchvision.datasets.ImageFolder(
             "{}/datasets/{}".format(ROOT, name),
             transform=transform(transform_name),
         )
+            # 打印标签字符串和对应的目标值
+    logger.info("Train,Dataset classes and their corresponding targets:")
+    for class_name, target_idx in dataset.class_to_idx.items():
+        logger.info(f"Class: {class_name}, Target: {target_idx}")
+    return dataset
 
 
 def train_dataloader(
@@ -121,7 +154,7 @@ def train_dataloader(
     logger.info("dataset {} found. Preparing DataLoader".format(name))
     batch_size = kwargs.get("batch_size", 1)
     trainloader = torch.utils.data.DataLoader(
-        trainset, shuffle=False, num_workers=2, batch_size=batch_size
+        trainset, shuffle=True, num_workers=2, batch_size=batch_size
     )
     logger.info("dataset {} loaded with batch size {}".format(name, batch_size))
     return trainloader
@@ -255,21 +288,60 @@ def load_test_dataset(name, transform_dataset, transform=transform_statistics):
     elif name.upper() == "RESNET_SVHN_ADV":
         return load_adv_dataset("resnet_svhn")
     elif name.upper() == "DENSENET_USTC":
-        return torchvision.datasets.ImageFolder(
+        dataset=  torchvision.datasets.ImageFolder(
             "{}/datasets/USTC/test".format(ROOT),
             transform=ustc_transform(),
         )
     elif name.upper() == "DENSENET_TRAFFIC_OUT":
-        return torchvision.datasets.ImageFolder(
+        dataset=  torchvision.datasets.ImageFolder(
             "{}/datasets/Traffic_Out".format(ROOT),
             transform=ustc_transform(),
         )
+    elif name.upper() == "TASK_1":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_1_in/test".format(ROOT),
+            transform=ustc_transform(),
+        )
+    elif name.upper() == "USTC_TASK_0_IN":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_0_in/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_0_OUT":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_0_out/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_1_IN":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_1_in/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_1_OUT":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_1_out/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_2_IN":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_2_in/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_2_OUT":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_2_out/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
     else:
-        return torchvision.datasets.ImageFolder(
+        dataset= torchvision.datasets.ImageFolder(
             "{}/datasets/{}".format(ROOT, name),
             transform=transform(transform_dataset),
         )
-
+            # 打印标签字符串和对应的目标值
+    logger.info("test,Dataset classes and their corresponding targets:")
+    for class_name, target_idx in dataset.class_to_idx.items():
+        logger.info(f"Class: {class_name}, Target: {target_idx}")
+    return dataset
 
 def dataset_channel_statistics(dataloader: torch.utils.data.DataLoader, decimal=4):
     """Calculate a dataset's empirical mean and standard deviation and round to `decimal` points"""
@@ -289,7 +361,6 @@ def dataset_channel_statistics(dataloader: torch.utils.data.DataLoader, decimal=
 def test_dataloader(
     name, transform_name="CIFAR10", transform=transform_statistics, *args, **kwargs
 ):
-    shuffle = False
     if name == "densenet10_adv":
         testset = load_adv_dataset("densenet10", *args, **kwargs)
     elif name == "densenet100_adv":
@@ -313,7 +384,7 @@ def test_dataloader(
 
     batch_size = kwargs.get("batch_size", 1)
     testloader = torch.utils.data.DataLoader(
-        testset, shuffle=shuffle, num_workers=0, batch_size=batch_size
+        testset, shuffle=True, num_workers=0, batch_size=batch_size
     )
     logger.info("dataset {} loaded with batch size {}".format(name, batch_size))
     return testloader
@@ -357,6 +428,11 @@ def load_pre_trained_nn(nn_name, gpu=None):
     else:
         map_location = gpu
     num_c = get_num_classes(get_in_dataset_name(nn_name))
+    if "icarl" in nn_name:
+        model_path = "{}/pre_trained/task_{}_model.pth".format(ROOT, nn_name.split("_")[-1])
+        model = IncModel(model_path, num_c)
+        model.model.eval()
+        return model.model
     if "densenet" in nn_name:
         model = DenseNetBC100(num_c)
         if "USTC" in nn_name:
@@ -364,6 +440,7 @@ def load_pre_trained_nn(nn_name, gpu=None):
         if "svhn" not in nn_name and "cifar" not in nn_name:
             return load_nn(nn_name, map_location)
         return load_nn_from_state_dict(nn_name, model, map_location)
+
     elif "resnet" in nn_name:
         model = ResNet34(num_c)
         return load_nn_from_state_dict(nn_name, model, map_location)
@@ -388,6 +465,8 @@ def save_model(model, PATH):
 
 
 def get_in_dataset_name(nn_name):
+    if "icarl" in nn_name:
+        return "ustc_task_{}_in".format(int(nn_name.split("_")[-1]))
     if "USTC" in nn_name:
         return "USTC"
     if "1" not in nn_name:
@@ -414,8 +493,9 @@ def get_nn_name(architecture, in_dataset_name):
             nn_name = "resnet_USTC"
         else:
             nn_name = "{}_{}".format(architecture.lower(), in_dataset_name.lower())
-    else:
-        return
+    elif "icarl" in architecture:
+        num = in_dataset_name.split("_")[2]
+        nn_name = "icarl_{}".format(num)
     return nn_name
 
 
@@ -427,6 +507,8 @@ def get_number_channels(dataset_name):
 
 def get_num_classes(dataset_name):
     dataset_name = dataset_name.upper()
+    if "TASK" in dataset_name:
+        return 5*(int(dataset_name.split("_")[2])+1)
     if "USTC" in dataset_name:
         return 7
     if "MNIST" in dataset_name or "SVHN" in dataset_name or "CIFAR10" == dataset_name:
@@ -449,18 +531,82 @@ def load_tensor(filename):
 def pred_loop(model, dataloader, gpu, *args, **kwargs):
     logits = []
     targets = []
+    predictions = []  # 临时存储预测结果用于计算性能
+    
+    model.eval()  # 确保模型在评估模式
+    
     with torch.no_grad():
         for (data, target) in tqdm(dataloader):
             if gpu is not None:
                 data = data.to(gpu)
+            
+            # 获取模型输出
             pred = model(data, *args, **kwargs)
-            logits.append(pred.detach().cpu())
-            targets.append(target.detach().cpu().reshape(-1, 1))
-
+            
+            # 提取logits
+            if isinstance(pred, dict):
+                pred_logits = pred.get('logits', None)
+                if pred_logits is None:
+                    # 尝试从其他键获取logits
+                    for key in ['output', 'prediction']:
+                        if key in pred:
+                            pred_logits = pred[key]
+                            break
+                    if pred_logits is None:
+                        raise ValueError("无法从模型输出中获取logits")
+            else:
+                pred_logits = pred
+            
+            # 获取预测类别
+            _, pred_class = torch.max(pred_logits, 1)
+            
+            logits.append(pred_logits.detach().cpu())
+            targets.append(target.detach().cpu())
+            predictions.append(pred_class.detach().cpu())
+    
+    # 合并结果
     logits = torch.vstack(logits)
-    targets = torch.vstack(targets).reshape(-1)
+    targets = torch.cat(targets)
+    predictions = torch.cat(predictions)
+    
+    # 计算并打印性能指标
+    print_performance_metrics(targets.numpy(), predictions.numpy())
+    
+    # 保持原始返回值不变
     return logits, targets
-
+def print_performance_metrics(true_labels, pred_labels):
+    """计算并打印性能指标"""
+    acc = accuracy_score(true_labels, pred_labels)
+    
+    # 计算每个类别的指标
+    precision = precision_score(true_labels, pred_labels, average='macro', zero_division=0)
+    recall = recall_score(true_labels, pred_labels, average='macro', zero_division=0)
+    f1 = f1_score(true_labels, pred_labels, average='macro', zero_division=0)
+    
+    # 计算混淆矩阵
+    cm = confusion_matrix(true_labels, pred_labels)
+    
+    # 计算每个类别的准确率
+    class_acc = cm.diagonal() / cm.sum(axis=1)
+    
+    # 打印性能指标
+    print("\n" + "="*50)
+    print("模型性能评估")
+    print("="*50)
+    print(f"整体准确率: {acc:.4f}")
+    print(f"宏平均精确率: {precision:.4f}")
+    print(f"宏平均召回率: {recall:.4f}")
+    print(f"宏平均F1分数: {f1:.4f}")
+    
+    # 打印每个类别的准确率
+    print("\n每个类别的准确率:")
+    for i, acc in enumerate(class_acc):
+        print(f"类别 {i}: {acc:.4f}")
+    
+    # 打印混淆矩阵
+    print("\n混淆矩阵:")
+    print(cm)
+    print("="*50 + "\n")
 
 def hidden_features_pred_loop(model, dataloader, gpu, *args, **kwargs):
     features = {}

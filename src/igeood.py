@@ -65,7 +65,8 @@ def main(
     if out_dataset_name == "ADV":
         out_dataset_name += nn_name
 
-    prefix = get_prefix(cov_mat_ood, means_ood, logits_flag, per_class, distance)
+    prefix = get_prefix(cov_mat_ood, means_ood,
+                        logits_flag, per_class, distance)
     filename = get_filename(prefix, temperature, eps)
 
     # in_dataset_name = dl.get_in_dataset_name(nn_name)
@@ -149,7 +150,8 @@ def main(
             fm.write_score_file(fw, val_scores)
             fw.close()
         else:
-            val_scores = fm.load_score_file(nn_name, val_dataset_name, val_filename)
+            val_scores = fm.load_score_file(
+                nn_name, val_dataset_name, val_filename)
 
     # Ensemble method
     # length = min(len(in_scores), len(out_scores))
@@ -158,11 +160,13 @@ def main(
     )
 
     if np.isnan(combine_in_score.max()) or np.isnan(combine_out_score.max()):
-        logger.warning("nan value found in score, returning without evaluating")
+        logger.warning(
+            "nan value found in score, returning without evaluating")
         return
 
     # Evaluation metric
-    method_name = "{}_{}".format(filename.split(".txt")[0], ensemble_method.__name__)
+    method_name = "{}_{}".format(filename.split(
+        ".txt")[0], ensemble_method.__name__)
     (
         fpr_at_tpr_in,
         fpr_at_tpr_out,
@@ -216,7 +220,7 @@ def igeoodwb_score(
     distance=fr_distance_multivariate_gaussian,
 ):
     """计算IGEOOD检测分数的主函数
-    
+
     参数:
         nn_name: 神经网络模型名称 (str)
         dataset_name: 待检测的数据集名称 (str)
@@ -230,7 +234,7 @@ def igeoodwb_score(
         eps: 对抗扰动强度 (float)
         per_class: 是否按类别处理协方差矩阵 (bool)
         distance: 距离度量函数 (callable)
-    
+
     返回:
         numpy.ndarray: 包含所有样本检测分数的矩阵
     """
@@ -248,15 +252,20 @@ def igeoodwb_score(
     cov_matrix_in = dl.load_hidden_features_cov(
         nn_name, in_dataset_name, True, None, per_class=per_class
     )
-    multi_sample_mean_in = dl.load_hidden_features_multi_means(nn_name, in_dataset_name)
-    
+    multi_sample_mean_in = dl.load_hidden_features_multi_means(
+        nn_name, in_dataset_name)
+
     # 当统计量不存在或需要重写时重新计算
     if cov_matrix_in is None or sample_mean_in is None or rewrite:
-        hidden_feature_estimator(nn_name, in_dataset_name, batch_size, gpu, True, True, None)
+        hidden_feature_estimator(
+            nn_name, in_dataset_name, batch_size, gpu, True, True, None)
         # 重新加载生成的统计量
-        cov_matrix_in = dl.load_hidden_features_cov(nn_name, in_dataset_name, True, None, per_class=per_class)
-        sample_mean_in = dl.load_hidden_features_means(nn_name, in_dataset_name)
-        multi_sample_mean_in = dl.load_hidden_features_multi_means(nn_name, in_dataset_name)
+        cov_matrix_in = dl.load_hidden_features_cov(
+            nn_name, in_dataset_name, True, None, per_class=per_class)
+        sample_mean_in = dl.load_hidden_features_means(
+            nn_name, in_dataset_name)
+        multi_sample_mean_in = dl.load_hidden_features_multi_means(
+            nn_name, in_dataset_name)
 
     # === OOD协方差矩阵处理 ===
     cov_matrix_out = None
@@ -266,24 +275,30 @@ def igeoodwb_score(
             cov_val_dataset_name = cov_mat_ood + nn_name
             cap = None  # 不使用采样上限
         else:
-            cap = 1000  # 常规OOD数据集采样上限
+            cap = 3000  # 常规OOD数据集采样上限
             cov_val_dataset_name = cov_mat_ood
-        
+
         logger.info(f"加载OOD协方差矩阵: {cov_val_dataset_name}")
-        cov_matrix_out = dl.load_hidden_features_cov(nn_name, cov_val_dataset_name, True, cap)
-        
+        cov_matrix_out = dl.load_hidden_features_cov(
+            nn_name, cov_val_dataset_name, True, cap)
+
         # 需要重新生成时调用特征估计器
         if cov_matrix_out is None or rewrite:
-            hidden_feature_estimator(nn_name, cov_val_dataset_name, batch_size, gpu, False, True, cap)
-            cov_matrix_out = dl.load_hidden_features_cov(nn_name, cov_val_dataset_name, True, cap)
+            hidden_feature_estimator(
+                nn_name, cov_val_dataset_name, batch_size, gpu, False, True, cap)
+            cov_matrix_out = dl.load_hidden_features_cov(
+                nn_name, cov_val_dataset_name, True, cap)
 
     # === OOD均值处理 ===
     sample_mean_out = sample_mean_in  # 默认使用训练集均值
     if means_ood is not None:
-        sample_mean_out = dl.load_hidden_features_means(nn_name, cov_val_dataset_name, cap=cap)
+        sample_mean_out = dl.load_hidden_features_means(
+            nn_name, cov_val_dataset_name, cap=cap)
         if sample_mean_out is None or rewrite:
-            hidden_feature_estimator(nn_name, cov_val_dataset_name, batch_size, gpu, False, True, cap)
-            sample_mean_out = dl.load_hidden_features_means(nn_name, cov_val_dataset_name, cap=cap)
+            hidden_feature_estimator(
+                nn_name, cov_val_dataset_name, batch_size, gpu, False, True, cap)
+            sample_mean_out = dl.load_hidden_features_means(
+                nn_name, cov_val_dataset_name, cap=cap)
 
     # === Logits质心处理 ===
     logits_centroids = None
@@ -292,13 +307,15 @@ def igeoodwb_score(
         # 当需要重新计算时调用质心估计器
         if logits_centroids is None or rewrite:
             logger.info("重新计算logits质心...")
-            logits_centroids, _, _, _ = run_logits_centroid_estimator(nn_name, gpu=gpu, batch_size=batch_size)
+            logits_centroids, _, _, _ = run_logits_centroid_estimator(
+                nn_name, gpu=gpu, batch_size=batch_size)
 
     logger.info("所有特征张量加载完成")
 
     # === 获取数据加载器 ===
     if dataloader is None:
-        dataloader = dl.test_dataloader(dataset_name, in_dataset_name, batch_size=batch_size)
+        dataloader = dl.test_dataloader(
+            dataset_name, in_dataset_name, batch_size=batch_size)
 
     # 调用核心检测算法
     return igeoodwb(
@@ -324,9 +341,10 @@ def igeoodwb(
     centroid_logits=None,
     multi_sample_mean_in=None,
     distance=fr_distance_multivariate_gaussian,
+    last_layers=-1  # 新增参数，控制层选择策略
 ):
     """IGEOOD核心检测算法实现
-    
+
     参数:
         model: 预训练好的分类模型
         dataloader: 测试数据加载器
@@ -339,30 +357,45 @@ def igeoodwb(
         temperature: 温度缩放参数
         eps: 对抗扰动强度
         multi_sample_mean_in: 多聚类中心均值（用于改进检测）
-    
+
     返回:
         numpy.ndarray: 包含所有样本检测分数的矩阵
     """
     t0 = time.time()
     length = len(dataloader)
     model.eval()  # 确保模型处于评估模式
-    n_layers = len(sample_mean_in)  # 获取隐藏层数量
-
-    # 初始化分数存储结构
-    igeoodfeature_scores = {i: [] for i in range(n_layers)}  # 各隐藏层特征分数
+    
+    # === 层选择策略 ===
+    n_layers = len(sample_mean_in)  # 获取总层数
+    
+    if last_layers == -1:
+        selected_layers = list(range(0, n_layers))
+    else:
+        selected_layers = list(range(n_layers-last_layers, n_layers))
+    logger.info(f"Selected layers: {selected_layers} (total layers: {n_layers})")
+    
+    # 初始化分数存储结构 - 只初始化选中的层
+    igeoodfeature_scores = {i: [] for i in selected_layers}  # 各隐藏层特征分数
     igeoodlogits_scores = []  # logits特征分数
-
+    multi_flag = True
+    if multi_sample_mean_in is not None and multi_flag:
+        logger.debug("使用多聚类")
+    else:
+        logger.debug("不使用多聚类")
+    
     # 遍历数据批次
     for batch_idx, data in enumerate(dataloader):
         # 处理输入数据（可能包含标签）
         if type(data) in [tuple, list]:
             data, _ = data  # 分离数据和标签
+        
         # 数据转移到GPU（如果可用）
         if gpu is not None:
             data = data.cuda()
+        
         # 设置需要梯度计算（用于对抗样本生成）
         data = Variable(data, requires_grad=True)
-        
+
         # 获取模型输出（logits和隐藏层特征）
         logits, out_features = model.feature_list(data)
 
@@ -387,36 +420,40 @@ def igeoodwb(
                     # 生成对抗扰动样本
                     temp_inputs = torch.add(data, gradient, alpha=-eps)
                     # 获取扰动后输出
-                    noised_logits, out_features = model.feature_list(temp_inputs)
+                    noised_logits, out_features = model.feature_list(
+                        temp_inputs)
                 # 重新计算扰动后距离
-                dist = igeoodlogits(noised_logits, temperature, centroid_logits)
+                dist = igeoodlogits(
+                    noised_logits, temperature, centroid_logits)
 
             # 记录logits分数
-            igeoodlogits_scores.extend(dist.detach().cpu().numpy().reshape(-1, 1))
-        #todo:把cov_mat_in和cov_mat_out取平均值作为样本的协方差矩阵
-        cov_in_out_mean = {}
-        for i in range(len(cov_mat_in)):
-            cov_in_out_mean[i] = (cov_mat_in[i] + cov_mat_out[i]) / 2
+            igeoodlogits_scores.extend(
+                dist.detach().cpu().numpy().reshape(-1, 1))
+        
         # === 隐藏层特征处理 ===
         with torch.no_grad():
-            # 遍历每个隐藏层
-            for layer_idx, out_feature in enumerate(out_features):
+            # 遍历每个选中的隐藏层
+            for layer_idx in selected_layers:
+                # 获取当前层特征
+                out_feature = out_features[layer_idx]
+                
                 # 特征空间调整（展平后取均值）
-                out_feature = out_feature.reshape(out_feature.shape[0], out_feature.shape[1], -1)
+                out_feature = out_feature.reshape(
+                    out_feature.shape[0], out_feature.shape[1], -1)
                 out_feature = torch.mean(out_feature, 2)
-
+                
                 # 计算Fisher-Rao分数（单/多聚类中心）
-                if multi_sample_mean_in is None:
-                    score1 = igeoodfeature(
-                        out_feature, sample_mean_in, cov_in_out_mean, cov_mat_in,
+                if multi_sample_mean_in is not None and multi_flag:
+                    score1 = multi_igeoodfeature(
+                        out_feature, multi_sample_mean_in, cov_mat_in, cov_mat_in,
                         layer_idx, num_classes, distance=distance
                     )
                 else:
-                    score1 = multi_igeoodfeature(
-                        out_feature, multi_sample_mean_in, cov_in_out_mean, cov_mat_in,
+                    score1 = igeoodfeature(
+                        out_feature, sample_mean_in, cov_mat_in, cov_mat_in,
                         layer_idx, num_classes, distance=distance
                     )
-                
+
                 # 取最小距离作为当前层分数
                 score1, _ = torch.min(score1, dim=1)
                 score1 = score1.detach().cpu().numpy().reshape(-1, 1)
@@ -424,15 +461,17 @@ def igeoodwb(
                 # OOD协方差矩阵处理（生成对比分数）
                 if cov_mat_out is not None:
                     score2 = igeoodfeature(
-                        out_feature, sample_mean_out, cov_in_out_mean, cov_mat_out,
+                        out_feature, sample_mean_out, cov_mat_in, cov_mat_out,
                         layer_idx, num_classes, distance=distance
                     )
                     score2, _ = torch.min(score2, dim=1)
                     score2 = score2.detach().cpu().numpy().reshape(-1, 1)
+                    
                     # 合并两种分数
-                    igeoodfeature_scores[layer_idx].extend(np.hstack([score1, score2]))
+                    layer_scores = np.hstack([score1, score2])
+                    igeoodfeature_scores[layer_idx].append(layer_scores)
                 else:
-                    igeoodfeature_scores[layer_idx].extend(score1)
+                    igeoodfeature_scores[layer_idx].append(score1)
 
         # === 进度记录 ===
         if batch_idx % (int(length / 10) + 1) == 0 and batch_idx > 0:
@@ -444,12 +483,36 @@ def igeoodwb(
             t0 = time.time()  # 重置计时器
 
     # === 分数整合 ===
-    # 合并所有隐藏层分数
-    scores = np.hstack(
-        [np.asarray(igeoodfeature_scores[i], dtype=np.float32) for i in range(n_layers)]
-    )
+    # 合并所有选中的隐藏层分数
+    scores_list = []
+    for layer_idx in selected_layers:
+        if igeoodfeature_scores[layer_idx]:  # 检查该层是否有分数
+            # 垂直堆叠该层的所有批次分数
+            layer_scores = np.vstack(igeoodfeature_scores[layer_idx])
+            
+            # 确保是2维数组（即使只有一列）
+            if layer_scores.ndim == 1:
+                layer_scores = layer_scores.reshape(-1, 1)
+            
+            scores_list.append(layer_scores)
+    
+    # 水平堆叠所有选中的层分数
+    if scores_list:
+        scores = np.hstack(scores_list)
+    else:
+        scores = np.array([])  # 空数组处理
+    
     # 合并logits分数（如果启用）
-    if logits_flag:
-        scores = np.hstack([scores, np.vstack(igeoodlogits_scores)])
+    if logits_flag and igeoodlogits_scores:
+        logits_scores = np.vstack(igeoodlogits_scores)
+        
+        # 确保logits分数是2维数组
+        if logits_scores.ndim == 1:
+            logits_scores = logits_scores.reshape(-1, 1)
+        
+        if scores.size > 0:
+            scores = np.hstack([scores, logits_scores])
+        else:
+            scores = logits_scores
 
     return scores
