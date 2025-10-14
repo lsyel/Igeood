@@ -21,7 +21,8 @@ def main(
     batch_size,
     gpu,
     rewrite=False,
-    ood_rate=0.05
+    ood_rate=0.05,
+    use_ood=True
 ):
     # Ensemble method
     mat_type = ""
@@ -71,7 +72,8 @@ def main(
             nn_name,
             num_features,
             eps,
-            gpu
+            gpu,
+            use_ood=use_ood
         )
         fw = fm.make_score_file(nn_name, in_dataset_name, filename)
         fm.write_score_file(fw, in_score)
@@ -101,7 +103,8 @@ def main(
             nn_name,
             num_features,
             eps,
-            gpu
+            gpu,
+            use_ood=use_ood
         )
         fw = fm.make_score_file(nn_name, out_dataset_name, filename)
         fm.write_score_file(fw, out_score)
@@ -138,6 +141,7 @@ def main(
                 num_features,
                 eps,
                 gpu,
+                use_ood=use_ood
             )
             fw = fm.make_score_file(nn_name, val_dataset_name, val_filename)
             fm.write_score_file(fw, val_score)
@@ -200,7 +204,8 @@ def get_enhanced_mahalanobis_score(
     nn_name,
     num_features,
     eps=0.0,
-    gpu=None
+    gpu=None,
+    use_ood=True
 ):
     """获取增强的 Mahalanobis 分数（包含 OOD 距离）"""
     logger.info("get enhanced Mahalanobis scores with OOD support")
@@ -218,7 +223,8 @@ def get_enhanced_mahalanobis_score(
             ood_inverse,
             i,
             eps,
-            gpu
+            gpu,
+            use_ood=use_ood
         )
         mahalanobis.append(m)
     mahalanobis = np.hstack(mahalanobis)
@@ -236,7 +242,8 @@ def get_enhanced_mahalanobis_layer_score(
     ood_inverse,      # OOD 协方差逆矩阵
     layer_index,
     eps,
-    gpu
+    gpu,
+    use_ood=True
 ) -> np.ndarray:
     """
     Compute the enhanced Mahalanobis confidence score with OOD support
@@ -276,7 +283,11 @@ def get_enhanced_mahalanobis_layer_score(
         
         # 合并两种分数（与 IGEOOD 一致）
         # combined_score = np.hstack([id_score_min, ood_score])
-        combined_score = np.hstack([id_score_max, ood_score])
+        # combined_score = np.hstack([id_score_max, ood_score])
+        if use_ood:
+            combined_score = np.hstack([id_score_max, ood_score])
+        else:
+            combined_score = id_score_max
         if eps > 0:
             # Input_processing in the direction of the predicted class
             sample_pred = id_score.max(1)[1]

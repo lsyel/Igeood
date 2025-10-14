@@ -135,7 +135,6 @@ if __name__ == "__main__":
     batch_size = args.batch_size
     gpu = args.gpu
     ood_rate = args.ood_rate
-
     # multiple temperature and eps
     temperature_list = args.temperatures
     eps_list = args.epsilons
@@ -170,15 +169,18 @@ if __name__ == "__main__":
             )
         elif method == "mahalanobis":
             # Mahalanobis uses only the blocks' outputs
-            mahalanobis_main(
+            mahalanobis_plus_main(
                 WeightRegression(ignore_dim=1),
                 nn_name,
                 in_dataset_name,
+                out_dataset_name,
                 out_dataset_name,
                 eps,
                 batch_size,
                 gpu,
                 rewrite,
+                ood_rate,
+                use_ood=False,
             )
         elif method == "mahalanobis_plus":
             # Mahalanobis uses only the blocks' outputs
@@ -193,6 +195,7 @@ if __name__ == "__main__":
                 gpu,
                 rewrite,
                 ood_rate,
+                use_ood=True
             )
         elif method == "mahalanobis_adv":
             adv_set = dl.load_adv_dataset(nn_name)
