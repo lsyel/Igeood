@@ -1,18 +1,14 @@
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
+from src.estimators import hidden_feature_estimator,hidden_feature_estimator_ood
 import utils.data_and_nn_loader as dl
 import utils.evaluation_metrics as em
 import utils.file_manager as fm
 from torch.autograd import Variable
 from utils.logger import logger, timing
 
-from src.ensemble_method import *
-from src.ensemble_method import MeanScore, WeightRegression
-from src.estimators import hidden_feature_estimator
-
 cudnn.benchmark = True
-
 
 @timing
 def main(
@@ -20,20 +16,19 @@ def main(
     nn_name,
     in_dataset_name,
     out_dataset_name,
+    ood_dataset_name,  # 新增：少量 OOD 数据集名称
     eps,
     batch_size,
     gpu,
     rewrite=False,
-    *args,
-    **kwargs
+    ood_rate=0.05
 ):
     # Ensemble method
     mat_type = ""
     # File naming
-    prefix = "mahalanobis"
+    prefix = "mahalanobis_ood_" + ood_dataset_name  # 修改文件名以包含 OOD 数据集名
 
     # Model
-    # in_dataset_name = dl.get_in_dataset_name(nn_name)
     num_classes = dl.get_num_classes(in_dataset_name)
     model = dl.load_pre_trained_nn(nn_name, gpu)
     model.eval()
@@ -43,15 +38,14 @@ def main(
     fm.make_output_folders(nn_name, in_dataset_name)
     fm.make_output_folders(nn_name, out_dataset_name)
 
-    # Matrices
+    # Matrices - ID 统计量
+    hidden_feature_estimator(nn_name, in_dataset_name, batch_size, gpu, True)
     inverse = dl.load_hidden_features_inv(nn_name, in_dataset_name)
     sample_mean = dl.load_hidden_features_means(nn_name, in_dataset_name)
-
-    if inverse is None or sample_mean is None:
-        hidden_feature_estimator(nn_name, in_dataset_name, batch_size, gpu, True)
-        inverse = dl.load_hidden_features_inv(nn_name, in_dataset_name)
-        sample_mean = dl.load_hidden_features_means(nn_name, in_dataset_name)
-    logger.info("tensors loaded")
+    
+    ood_sample_mean, ood_inverse, _ = hidden_feature_estimator_ood(
+        nn_name, ood_dataset_name,batch_size=10, gpu=gpu,ood_rate=ood_rate
+    )
 
     filename = "{}{}_{:.4f}.txt".format(prefix, mat_type, eps)
 
@@ -59,23 +53,25 @@ def main(
     f = fm.find_score_file(nn_name, in_dataset_name, filename)
     if rewrite is True or f is None:
         logger.info(
-            "Calculating mahalanobis score for nn {} and dataset {}".format(
+            "Calculating enhanced mahalanobis score for nn {} and dataset {}".format(
                 nn_name, in_dataset_name
             )
         )
         in_dataloader = dl.test_dataloader(
             in_dataset_name, in_dataset_name, batch_size=batch_size
         )
-        in_score = get_mahalanobis_score(
+        in_score = get_enhanced_mahalanobis_score(
             model,
             in_dataloader,
             sample_mean,
             inverse,
+            ood_sample_mean,
+            ood_inverse,
             num_classes,
             nn_name,
             num_features,
             eps,
-            gpu,
+            gpu
         )
         fw = fm.make_score_file(nn_name, in_dataset_name, filename)
         fm.write_score_file(fw, in_score)
@@ -87,23 +83,25 @@ def main(
     f = fm.find_score_file(nn_name, out_dataset_name, filename)
     if rewrite or f is None:
         logger.info(
-            "Calculating mahalanobis score for nn {} and dataset {}".format(
+            "Calculating enhanced mahalanobis score for nn {} and dataset {}".format(
                 nn_name, out_dataset_name
             )
         )
         out_dataloader = dl.test_dataloader(
             out_dataset_name, in_dataset_name, batch_size=batch_size
         )
-        out_score = get_mahalanobis_score(
+        out_score = get_enhanced_mahalanobis_score(
             model,
             out_dataloader,
             sample_mean,
             inverse,
+            ood_sample_mean,
+            ood_inverse,
             num_classes,
             nn_name,
             num_features,
             eps,
-            gpu,
+            gpu
         )
         fw = fm.make_score_file(nn_name, out_dataset_name, filename)
         fm.write_score_file(fw, out_score)
@@ -128,11 +126,13 @@ def main(
             val_dataloader = dl.test_dataloader(
                 val_dataset_name, in_dataset_name, batch_size=batch_size
             )
-            val_score = get_mahalanobis_score(
+            val_score = get_enhanced_mahalanobis_score(
                 model,
                 val_dataloader,
                 sample_mean,
                 inverse,
+                ood_sample_mean,
+                ood_inverse,
                 num_classes,
                 nn_name,
                 num_features,
@@ -189,55 +189,62 @@ def main(
     return fpr_at_tpr_in, detection, auroc, aupr_in
 
 
-def get_mahalanobis_score(
+def get_enhanced_mahalanobis_score(
     model,
     dataloader,
     sample_mean,
     inverse,
+    ood_sample_mean,  # 新增：OOD 均值
+    ood_inverse,      # 新增：OOD 协方差逆矩阵
     num_classes,
     nn_name,
     num_features,
     eps=0.0,
-    gpu=None,
+    gpu=None
 ):
-
-    logger.info("get Mahalanobis scores")
+    """获取增强的 Mahalanobis 分数（包含 OOD 距离）"""
+    logger.info("get enhanced Mahalanobis scores with OOD support")
     logger.info("noise magnitude: " + str(eps))
     mahalanobis = []
     for i in range(num_features):
-        m = get_mahalanobis_layer_score(
+        m = get_enhanced_mahalanobis_layer_score(
             model,
             dataloader,
             num_classes,
             nn_name,
             sample_mean,
             inverse,
+            ood_sample_mean,  # 传递 OOD 统计量
+            ood_inverse,
             i,
             eps,
-            gpu,
+            gpu
         )
         mahalanobis.append(m)
     mahalanobis = np.hstack(mahalanobis)
     return mahalanobis
 
 
-def get_mahalanobis_layer_score(
+def get_enhanced_mahalanobis_layer_score(
     model,
     test_loader,
     num_classes,
     net_type,
     sample_mean,
     inverse,
+    ood_sample_mean,  # OOD 均值
+    ood_inverse,      # OOD 协方差逆矩阵
     layer_index,
     eps,
-    gpu,
+    gpu
 ) -> np.ndarray:
     """
-    Compute the Mahalanobis confidence score
+    Compute the enhanced Mahalanobis confidence score with OOD support
     return: Mahalanobis score from layer_index
     """
     model.eval()
     Mahalanobis = []
+    
     for data in test_loader:
         if type(data) in [tuple, list]:
             data, _ = data
@@ -249,13 +256,27 @@ def get_mahalanobis_layer_score(
         out_features = out_features.view(out_features.size(0), out_features.size(1), -1)
         out_features = torch.mean(out_features, 2)
 
-        # compute Mahalanobis score
-        gaussian_score = compute_mahalanobis_distance(
+        # 计算 ID Mahalanobis 分数（使用 ID 统计量）
+        id_score = compute_mahalanobis_distance(
             out_features, sample_mean, inverse, layer_index, num_classes
         )
+        
+        # 取最小距离作为 ID 分数
+        id_score_min, _ = torch.min(id_score, dim=1)
+        id_score_min = id_score_min.detach().cpu().numpy().reshape(-1, 1)
+        
+        # 计算 OOD Mahalanobis 分数（使用 OOD 统计量）
+        ood_score = compute_ood_distance(
+            out_features, ood_sample_mean, ood_inverse, layer_index
+        )
+        ood_score = ood_score.detach().cpu().numpy().reshape(-1, 1)
+        
+        # 合并两种分数（与 IGEOOD 一致）
+        combined_score = np.hstack([id_score_min, ood_score])
+
         if eps > 0:
             # Input_processing in the direction of the predicted class
-            sample_pred = gaussian_score.max(1)[1]
+            sample_pred = id_score.max(1)[1]
             batch_sample_mean = torch.vstack(
                 [sample_mean[layer_index][i] for i in sample_pred.cpu().numpy()]
             )
@@ -282,20 +303,33 @@ def get_mahalanobis_layer_score(
                 noise_out_features.size(0), noise_out_features.size(1), -1
             )
             noise_out_features = torch.mean(noise_out_features, 2)
-            gaussian_score = compute_mahalanobis_distance(
+            
+            # 重新计算扰动后 ID 分数
+            noise_id_score = compute_mahalanobis_distance(
                 noise_out_features, sample_mean, inverse, layer_index, num_classes
             )
-        gaussian_score, _ = torch.max(gaussian_score, dim=1)
+            noise_id_score_min, _ = torch.min(noise_id_score, dim=1)
+            noise_id_score_min = noise_id_score_min.detach().cpu().numpy().reshape(-1, 1)
+            
+            # 重新计算扰动后 OOD 分数
+            noise_ood_score = compute_ood_distance(
+                noise_out_features, ood_sample_mean, ood_inverse, layer_index
+            )
+            noise_ood_score = noise_ood_score.detach().cpu().numpy().reshape(-1, 1)
+            
+            # 合并扰动后分数
+            combined_score = np.hstack([noise_id_score_min, noise_ood_score])
+        
+        Mahalanobis.append(combined_score)
 
-        Mahalanobis.extend(gaussian_score.cpu().numpy())
-
-    Mahalanobis = np.asarray(Mahalanobis, dtype=np.float32).reshape(-1, 1)
+    Mahalanobis = np.vstack(Mahalanobis)
     return Mahalanobis
 
 
 def compute_mahalanobis_distance(
     out_features, sample_mean, inverse, layer_index, num_classes
 ):
+    """计算 ID Mahalanobis 距离（原始实现保持不变）"""
     gaussian_score = 0
     for i in range(num_classes):
         batch_sample_mean = sample_mean[layer_index][i]
@@ -310,47 +344,13 @@ def compute_mahalanobis_distance(
     return gaussian_score
 
 
-def predict(
-    nn_name,
-    dataloader,
-    batch_size,
-    gpu,
-    eps=0,
-):
-    logger.info("get Mahalanobis scores")
-    logger.info("noise magnitude: " + str(eps))
-    mahalanobis = []
-
-    # model
-    in_dataset_name = dl.get_in_dataset_name(nn_name)
-    num_classes = dl.get_num_classes(in_dataset_name)
-    model = dl.load_pre_trained_nn(nn_name, gpu)
-    model.eval()
-
-    feature_list = dl.get_feature_list(model, gpu)
-    num_features = len(feature_list)
-
-    # Matrices
-    inverse = dl.load_hidden_features_inv(nn_name, in_dataset_name)
-    sample_mean = dl.load_hidden_features_means(nn_name, in_dataset_name)
-
-    if inverse is None or sample_mean is None:
-        hidden_feature_estimator(nn_name, in_dataset_name, batch_size, gpu, True)
-        inverse = dl.load_hidden_features_inv(nn_name, in_dataset_name)
-        sample_mean = dl.load_hidden_features_means(nn_name, in_dataset_name)
-
-    for i in range(num_features):
-        m = get_mahalanobis_layer_score(
-            model,
-            dataloader,
-            num_classes,
-            nn_name,
-            sample_mean,
-            inverse,
-            i,
-            eps,
-            gpu,
-        )
-        mahalanobis.append(m)
-    mahalanobis = np.hstack(mahalanobis)
-    return mahalanobis
+# 新增函数：计算 OOD Mahalanobis 距离
+def compute_ood_distance(out_features, ood_sample_mean, ood_inverse, layer_index):
+    """计算到 OOD 分布的 Mahalanobis 距离"""
+    # OOD 数据只有一个整体均值
+    batch_ood_mean = ood_sample_mean[layer_index]
+    zero_f = out_features.data - batch_ood_mean
+    term_gau = (
+        -0.5 * torch.mm(torch.mm(zero_f, ood_inverse[layer_index]), zero_f.t()).diag()
+    )
+    return term_gau.view(-1, 1)

@@ -5,10 +5,10 @@ import torch
 from models.my_resnet.linears import SimpleLinear
 import torch.nn.functional as F
 
-def get_convnet():
-    return my_resnet34(num_c=1,use_moe=True,moe_experts=1)
+def get_convnet(use_moe=True, moe_experts=1):
+    return my_resnet34(num_c=1,use_moe=use_moe,moe_experts=moe_experts)
 
-
+    
 class BaseNet(nn.Module):
     def __init__(self):
         super(BaseNet, self).__init__()
@@ -72,11 +72,13 @@ class BaseNet(nn.Module):
         return test_acc
 
 class IncrementalNet(BaseNet):
-    def __init__(self, use_moe=False):
+    def __init__(self, num_classes, use_moe=False, moe_experts=1):
         super().__init__()
         self.use_moe = use_moe  # 👈 新增：是否使用 MoE
         self._cur_task = 0      # 👈 新增：记录当前任务 ID
-        self.fc = self.generate_fc(self.feature_dim, 5)
+        self.fc = self.generate_fc(self.feature_dim, num_classes)
+        self.convnet = get_convnet(use_moe=use_moe, moe_experts=moe_experts)
+
     def update_fc(self, nb_classes):
         fc = self.generate_fc(self.feature_dim, nb_classes)
         if self.fc is not None:

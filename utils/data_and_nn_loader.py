@@ -125,6 +125,16 @@ def load_train_dataset(name, transform_name, transform=transform_statistics):
             "{}/datasets/ustc_task_0_in/train".format(ROOT),
             transform=train_cil_survey_transform(),
         )
+    elif name.upper() == "USTC_TASK_1_IN":
+        dataset = torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_1_in/train".format(ROOT),
+            transform=train_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_2_IN":
+        dataset = torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_2_in/train".format(ROOT),
+            transform=train_cil_survey_transform(),
+        )
     else:
         dataset = torchvision.datasets.ImageFolder(
             "{}/datasets/{}".format(ROOT, name),
@@ -144,7 +154,7 @@ def train_dataloader(
     logger.info("dataset {} found. Preparing DataLoader".format(name))
     batch_size = kwargs.get("batch_size", 1)
     trainloader = torch.utils.data.DataLoader(
-        trainset, shuffle=False, num_workers=2, batch_size=batch_size
+        trainset, shuffle=True, num_workers=2, batch_size=batch_size
     )
     logger.info("dataset {} loaded with batch size {}".format(name, batch_size))
     return trainloader
@@ -292,9 +302,34 @@ def load_test_dataset(name, transform_dataset, transform=transform_statistics):
             "{}/datasets/ustc_task_1_in/test".format(ROOT),
             transform=ustc_transform(),
         )
-    elif name == "ustc_task_0_in":
+    elif name.upper() == "USTC_TASK_0_IN":
         dataset=  torchvision.datasets.ImageFolder(
             "{}/datasets/ustc_task_0_in/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_0_OUT":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_0_out/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_1_IN":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_1_in/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_1_OUT":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_1_out/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_2_IN":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_2_in/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
+    elif name.upper() == "USTC_TASK_2_OUT":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_2_out/test".format(ROOT),
             transform=test_cil_survey_transform(),
         )
     else:
@@ -326,7 +361,6 @@ def dataset_channel_statistics(dataloader: torch.utils.data.DataLoader, decimal=
 def test_dataloader(
     name, transform_name="CIFAR10", transform=transform_statistics, *args, **kwargs
 ):
-    shuffle = False
     if name == "densenet10_adv":
         testset = load_adv_dataset("densenet10", *args, **kwargs)
     elif name == "densenet100_adv":
@@ -350,7 +384,7 @@ def test_dataloader(
 
     batch_size = kwargs.get("batch_size", 1)
     testloader = torch.utils.data.DataLoader(
-        testset, shuffle=shuffle, num_workers=0, batch_size=batch_size
+        testset, shuffle=True, num_workers=0, batch_size=batch_size
     )
     logger.info("dataset {} loaded with batch size {}".format(name, batch_size))
     return testloader
@@ -396,7 +430,7 @@ def load_pre_trained_nn(nn_name, gpu=None):
     num_c = get_num_classes(get_in_dataset_name(nn_name))
     if "icarl" in nn_name:
         model_path = "{}/pre_trained/task_{}_model.pth".format(ROOT, nn_name.split("_")[-1])
-        model = IncModel(model_path)
+        model = IncModel(model_path, num_c)
         model.model.eval()
         return model.model
     if "densenet" in nn_name:
@@ -460,7 +494,7 @@ def get_nn_name(architecture, in_dataset_name):
         else:
             nn_name = "{}_{}".format(architecture.lower(), in_dataset_name.lower())
     elif "icarl" in architecture:
-        num = in_dataset_name.split("_")[-1]
+        num = in_dataset_name.split("_")[2]
         nn_name = "icarl_{}".format(num)
     return nn_name
 
