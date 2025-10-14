@@ -2,7 +2,7 @@
 ROOT=$(readlink -f $(dirname $0))
 cd $ROOT
 # 默认方法列表
-DEFAULT_METHODS=("mahalanobis" "mahalanobis_plus")
+DEFAULT_METHODS=("mahalanobis" "mahalanobis_multi" "mahalanobis_plus")
 
 # 检查是否提供了方法参数
 if [ $# -gt 0 ]; then
@@ -21,6 +21,8 @@ for METHOD in "${METHODS[@]}"; do
     
     if [ "$METHOD" == "mahalanobis" ]; then
         ./run_mahalanobis.sh
+    elif [ "$METHOD" == "mahalanobis_multi" ]; then
+        ./run_mahalanobis_multi.sh
     elif [ "$METHOD" == "mahalanobis_plus" ]; then
         ./run_mahalanobis_plus.sh
     else

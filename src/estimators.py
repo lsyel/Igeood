@@ -10,7 +10,7 @@ from utils.kmeans import *
 from utils.logger import logger
 
 from src.measures import fisher_rao_logits_distance
-
+from utils.kmeans import *
 ROOT = dl.ROOT
 
 
@@ -138,25 +138,16 @@ def get_hidden_feat_sample_mean(hidden_feature_sample):
     return sample_class_mean
 
 
-def multi_get_hidden_feat_sample_mean(hidden_feature_sample, max_clusters=5, n_jobs=4):
+def multi_get_hidden_feat_sample_mean(hidden_feature_sample, max_clusters=5):
     num_features = len(hidden_feature_sample)
     sample_class_mean = {}
 
     for i in range(num_features):
         feature_dict = hidden_feature_sample[i]
         sample_class_mean[i] = {}
-
-        # 安全处理空类别
-        if not feature_dict:
-            continue
-
-        # 并行处理每个类别
-        results = Parallel(n_jobs=n_jobs)(
-            delayed(kmeans_precess_class)(c, samples, max_clusters)
-            for c, samples in feature_dict.items() if len(samples) > 0
-        )
-
-        for c, centers in results:
+        # 顺序处理每个类别
+        for c, samples in feature_dict.items():
+            _, centers = kmeans_process_class(c, samples, max_clusters)
             sample_class_mean[i][c] = torch.from_numpy(centers).float()
 
     return sample_class_mean
@@ -202,6 +193,7 @@ def hidden_feature_estimator(
     train=True,
     diag=False,
     cap=None,
+    max_clusters=1,  # 新增聚类数
     *args,
     **kwargs
 ):
@@ -241,33 +233,34 @@ def hidden_feature_estimator(
     # 获取隐藏层特征样本
     sample = get_hidden_features_sample(model, dataloader, gpu, cap)
     # 计算单聚类中心均值
-    means = get_hidden_feat_sample_mean(sample)
+    single_means  = get_hidden_feat_sample_mean(sample)
     # 计算协方差矩阵及其逆矩阵
     inv, cov = get_hidden_feat_cov_inv_matrix(
-        sample, means, diag, *args, **kwargs)
-    # 计算多聚类中心均值（5个聚类中心）
-    # multi_means = multi_get_hidden_feat_sample_mean(sample, max_clusters=10)
-    # 评估聚类质量
-    # cluster_report = evaluate_clustering_quality(multi_means)
-    # print_clustering_report(cluster_report)
+        sample, single_means, diag, *args, **kwargs)
     # 创建保存目录
     os.makedirs("{}/tensors/{}/{}".format(ROOT,
                 nn_name, dataset_name), exist_ok=True)
+    # 计算多聚类中心均值（5个聚类中心）
+    multi_means =None
+    if max_clusters>1:
+        multi_means = multi_get_hidden_feat_sample_mean(sample, max_clusters=max_clusters)
+        # 评估聚类质量
+        # cluster_report = evaluate_clustering_quality(multi_means)
+        # print_clustering_report(cluster_report)
+            # 保存多中心均值（5个聚类）
+        filename = "{}/tensors/{}/{}/hidden_features_multi_means{}.pt".format(
+            ROOT, nn_name, dataset_name, cap_str
+        )
+        logger.info("saving file {}".format(filename))
+        torch.save(multi_means, filename)
+
 
     # 保存单中心均值
     filename = "{}/tensors/{}/{}/hidden_features_means{}.pt".format(
         ROOT, nn_name, dataset_name, cap_str
     )
     logger.info("saving file {}".format(filename))
-    torch.save(means, filename)
-
-    # 保存多中心均值（5个聚类）
-    filename = "{}/tensors/{}/{}/hidden_features_multi_means{}.pt".format(
-        ROOT, nn_name, dataset_name, cap_str
-    )
-    logger.info("saving file {}".format(filename))
-    # torch.save(multi_means, filename)
-
+    torch.save(single_means, filename)
     # 处理协方差矩阵类型标记
     mat_type = ""
     if diag:
@@ -287,7 +280,7 @@ def hidden_feature_estimator(
     logger.info("saving file {}".format(filename))
     torch.save(cov, filename)
 
-    return (means, inv, cov)
+    return (single_means, inv, cov,multi_means)
 
 
 if __name__ == "__main__":

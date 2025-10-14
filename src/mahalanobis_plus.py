@@ -22,7 +22,8 @@ def main(
     gpu,
     rewrite=False,
     ood_rate=0.05,
-    use_ood=True
+    use_ood=False,
+    use_multi_centroid=False,  # 新增：多质心开关
 ):
     # Ensemble method
     mat_type = ""
@@ -40,14 +41,17 @@ def main(
     fm.make_output_folders(nn_name, out_dataset_name)
 
     # Matrices - ID 统计量
-    hidden_feature_estimator(nn_name, in_dataset_name, batch_size, gpu, True)
-    inverse = dl.load_hidden_features_inv(nn_name, in_dataset_name)
-    sample_mean = dl.load_hidden_features_means(nn_name, in_dataset_name)
-    
+    single_means,inverse,_,multi_means = hidden_feature_estimator(nn_name, in_dataset_name, batch_size, gpu, True,max_clusters=5)
     ood_sample_mean, ood_inverse, _ = hidden_feature_estimator_ood(
         nn_name, ood_dataset_name,batch_size=10, gpu=gpu,ood_rate=ood_rate
     )
-
+    # 根据开关选择使用单质心还是多质心
+    if use_multi_centroid:
+        logger.info("使用多质心模式")
+        sample_mean = multi_means
+    else:
+        logger.info("使用单质心模式")
+        sample_mean = single_means
     filename = "{}{}_{:.4f}.txt".format(prefix, mat_type, eps)
 
     # Get in scores
@@ -73,7 +77,8 @@ def main(
             num_features,
             eps,
             gpu,
-            use_ood=use_ood
+            use_ood=use_ood,
+            use_multi_centroid=use_multi_centroid,  # 传递多质心开关
         )
         fw = fm.make_score_file(nn_name, in_dataset_name, filename)
         fm.write_score_file(fw, in_score)
@@ -104,7 +109,8 @@ def main(
             num_features,
             eps,
             gpu,
-            use_ood=use_ood
+            use_ood=use_ood,
+            use_multi_centroid=use_multi_centroid,  # 传递多质心开关
         )
         fw = fm.make_score_file(nn_name, out_dataset_name, filename)
         fm.write_score_file(fw, out_score)
@@ -141,7 +147,8 @@ def main(
                 num_features,
                 eps,
                 gpu,
-                use_ood=use_ood
+                use_ood=use_ood,
+                use_multi_centroid=use_multi_centroid,  # 传递多质心开关
             )
             fw = fm.make_score_file(nn_name, val_dataset_name, val_filename)
             fm.write_score_file(fw, val_score)
@@ -205,7 +212,8 @@ def get_enhanced_mahalanobis_score(
     num_features,
     eps=0.0,
     gpu=None,
-    use_ood=True
+    use_ood=True,
+    use_multi_centroid=True  # 新增：多质心开关
 ):
     """获取增强的 Mahalanobis 分数（包含 OOD 距离）"""
     logger.info("get enhanced Mahalanobis scores with OOD support")
@@ -224,7 +232,8 @@ def get_enhanced_mahalanobis_score(
             i,
             eps,
             gpu,
-            use_ood=use_ood
+            use_ood=use_ood,
+            use_multi_centroid=use_multi_centroid  # 传递多质心开关
         )
         mahalanobis.append(m)
     mahalanobis = np.hstack(mahalanobis)
@@ -243,7 +252,8 @@ def get_enhanced_mahalanobis_layer_score(
     layer_index,
     eps,
     gpu,
-    use_ood=True
+    use_ood=True,
+    use_multi_centroid=True  # 新增：多质心开关
 ) -> np.ndarray:
     """
     Compute the enhanced Mahalanobis confidence score with OOD support
@@ -265,7 +275,7 @@ def get_enhanced_mahalanobis_layer_score(
 
         # 计算 ID Mahalanobis 分数（使用 ID 统计量）
         id_score = compute_mahalanobis_distance(
-            out_features, sample_mean, inverse, layer_index, num_classes
+            out_features, sample_mean, inverse, layer_index, num_classes, use_multi_centroid
         )
         
         # 取最小距离作为 ID 分数
@@ -341,16 +351,46 @@ def get_enhanced_mahalanobis_layer_score(
 
 
 def compute_mahalanobis_distance(
-    out_features, sample_mean, inverse, layer_index, num_classes
+    out_features, 
+    sample_mean, 
+    inverse, 
+    layer_index, 
+    num_classes,
+    use_multi_centroid=True  # 新增：多质心开关
 ):
-    """计算 ID Mahalanobis 距离（原始实现保持不变）"""
+    """计算 ID Mahalanobis 距离（支持多质心）"""
+    device = out_features.device
+
     gaussian_score = 0
     for i in range(num_classes):
-        batch_sample_mean = sample_mean[layer_index][i]
-        zero_f = out_features.data - batch_sample_mean
-        term_gau = (
-            -0.5 * torch.mm(torch.mm(zero_f, inverse[layer_index]), zero_f.t()).diag()
-        )
+        # 获取第i类的质心
+        class_means = sample_mean[layer_index][i]
+        
+        if use_multi_centroid:
+            # 计算所有质心的距离
+            distances = []
+            for mean in class_means:
+                mean = mean.to(device)
+                zero_f = out_features.data - mean
+                term_gau = (
+                    -0.5 * torch.mm(torch.mm(zero_f, inverse[layer_index].to(device)), zero_f.t()).diag()
+                )
+                distances.append(term_gau)
+            
+            # 混合策略：加权组合最大值和平均值
+            if distances:
+                distances_tensor = torch.stack(distances)
+                max_distance = torch.max(distances_tensor, dim=0)[0]
+                avg_distance = torch.mean(distances_tensor, dim=0)
+                min_distance = torch.min(distances_tensor, dim=0)[0]
+                term_gau = 0.7*max_distance   - 0.3*min_distance
+        else:
+            # 单质心模式
+            zero_f = out_features.data - class_means
+            term_gau = (
+                -0.5 * torch.mm(torch.mm(zero_f, inverse[layer_index].to(device)), zero_f.t()).diag()
+            )
+        
         if i == 0:
             gaussian_score = term_gau.view(-1, 1)
         else:
