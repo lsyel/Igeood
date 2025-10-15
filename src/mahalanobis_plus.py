@@ -117,7 +117,9 @@ def main(
         fw.close()
     else:
         out_score = fm.load_score_file(nn_name, out_dataset_name, filename)
-
+    #inscore 和 outscore 数量保持一致,都取最小值
+    in_score = in_score[:out_score.shape[0]]
+    out_score = out_score[:in_score.shape[0]]
     # Validation data
     ensemble_name = ensemble_method.__name__
     if "val" in ensemble_method.__name__:
