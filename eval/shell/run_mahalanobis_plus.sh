@@ -4,6 +4,8 @@
 RATES=(0.005)
 echo "删除旧的tensors和results目录"
 rm -rf /root/wzhdesign/Igeood/tensors /root/wzhdesign/Igeood/results
+mkdir -p eval
+
 # 循环执行三次（0,1,2）
 for i in {0..2}; do
     echo "-------- 开始执行任务 $i --------"
