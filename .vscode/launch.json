@@ -326,5 +326,28 @@
             ],
             // "preLaunchTask": "Delete Folder"
         },
+        {
+            "name": "mahalanobis_multi_icarl_task_0",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/root/wzhdesign/Igeood/eval.py",
+            "console": "integratedTerminal",
+            "args": [
+                "mahalanobis_multi",
+                "--nn",
+                "icarl",
+                "--in-dataset",
+                "ustc_task_0_in",
+                "--out-dataset",
+                "ustc_task_0_out",
+                "--temperature",
+                "5.3",
+                "--epsilon",
+                "0",
+                "-gpu",
+                "1",
+            ],
+            // "preLaunchTask": "Delete Folder"
+        },
     ]
 }

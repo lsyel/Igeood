@@ -34,6 +34,7 @@ parser.add_argument(
         "mahalanobis",
         "mahalanobis_multi",
         "mahalanobis_plus",
+        "mahalanobis_ood",
         "mahalanobis_adv",
         "kl_score_sum",
         "kl_score_min",
@@ -196,6 +197,21 @@ if __name__ == "__main__":
                 rewrite,
                 ood_rate,
                 use_multi_centroid=True,
+            )
+        elif method == "mahalanobis_ood":
+            # Mahalanobis uses only the blocks' outputs
+            mahalanobis_plus_main(
+                WeightRegression(ignore_dim=1),
+                nn_name,
+                in_dataset_name,
+                out_dataset_name,
+                out_dataset_name,
+                eps,
+                batch_size,
+                gpu,
+                rewrite,
+                ood_rate,
+                use_ood=True,
             )
         elif method == "mahalanobis_plus":
             # Mahalanobis uses only the blocks' outputs

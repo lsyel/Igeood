@@ -266,7 +266,7 @@ def get_enhanced_mahalanobis_layer_score(
         if type(data) in [tuple, list]:
             data, _ = data
         if gpu is not None:
-            data = data.cuda()
+            data = data.cuda(gpu)
         data = Variable(data, requires_grad=True)
 
         out_features = model.intermediate_forward(data, layer_index)
@@ -295,9 +295,9 @@ def get_enhanced_mahalanobis_layer_score(
         # combined_score = np.hstack([id_score_min, ood_score])
         # combined_score = np.hstack([id_score_max, ood_score])
         if use_ood:
-            combined_score = np.hstack([id_score_max, ood_score])
+            combined_score = np.hstack([id_score_max, id_score_min,ood_score])
         else:
-            combined_score = id_score_max
+            combined_score = np.hstack([id_score_min,id_score_max])
         if eps > 0:
             # Input_processing in the direction of the predicted class
             sample_pred = id_score.max(1)[1]
@@ -381,9 +381,9 @@ def compute_mahalanobis_distance(
             if distances:
                 distances_tensor = torch.stack(distances)
                 max_distance = torch.max(distances_tensor, dim=0)[0]
-                avg_distance = torch.mean(distances_tensor, dim=0)
-                min_distance = torch.min(distances_tensor, dim=0)[0]
-                term_gau = 0.7*max_distance   - 0.3*min_distance
+                # avg_distance = torch.mean(distances_tensor, dim=0)
+                # min_distance = torch.min(distances_tensor, dim=0)[0]
+                term_gau = max_distance   
         else:
             # 单质心模式
             zero_f = out_features.data - class_means

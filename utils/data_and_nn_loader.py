@@ -430,8 +430,7 @@ def load_pre_trained_nn(nn_name, gpu=None):
     num_c = get_num_classes(get_in_dataset_name(nn_name))
     if "icarl" in nn_name:
         model_path = "{}/pre_trained/task_{}_model.pth".format(ROOT, nn_name.split("_")[-1])
-        model = IncModel(model_path, num_c)
-        model.model.eval()
+        model = IncModel(model_path, num_c, map_location)
         return model.model
     if "densenet" in nn_name:
         model = DenseNetBC100(num_c)
@@ -789,7 +788,7 @@ def load_test_logits_centroid(nn_name, dataset_name, cap=1000):
 
 def get_feature_list(model, gpu):
     if gpu is not None:
-        temp_x = torch.rand(2, 3, 32, 32).cuda()
+        temp_x = torch.rand(2, 3, 32, 32).cuda(gpu)
     else:
         temp_x = torch.rand(2, 3, 32, 32)
     temp_x = Variable(temp_x)
