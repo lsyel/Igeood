@@ -1,12 +1,95 @@
 import numpy as np
 import logging
+from src.ensemble_method import WeightRegression
 
 from sklearn.ensemble import IsolationForest
 from src.mahalanobis_plus import *
 
 # 配置日志
 logger = logging.getLogger(__name__)
-
+    # 测试配置
+test_configurations = [
+        {
+            'name': '模型0 内分布',
+            'nn_name': 'icarl_0',
+            'in_dataset_name': 'ustc_task_0_in',
+            'test_dataset_name': 'ustc_task_0_in',
+            'voting_threshold': 0.2  # 60%的层认为是OOD则判定为OOD
+            
+        },
+        {
+            'name': '模型0 外分布',
+            'nn_name': 'icarl_0',
+            'in_dataset_name': 'ustc_task_0_in',
+            'test_dataset_name': 'ustc_task_0_out',
+            'voting_threshold': 0.2  # 60%的层认为是OOD则判定为OOD
+            
+        },
+        {
+            'name': '模型0 混合',
+            'nn_name': 'icarl_0',
+            'in_dataset_name': 'ustc_task_0_in',
+            'test_dataset_name': 'ustc_task_1_in',
+            'voting_threshold': 0.2  # 60%的层认为是OOD则判定为OOD
+            
+        },
+        {
+            'name':'模型1 内分布',   
+            'nn_name': 'icarl_1',
+            'in_dataset_name': 'ustc_task_1_in',
+            'test_dataset_name': 'ustc_task_1_in',
+            'voting_threshold': 0.2  # 60%的层认为是OOD则判定为OOD
+            
+        },
+        {
+            'name':'模型1 外分布',   
+            'nn_name': 'icarl_1',
+            'in_dataset_name': 'ustc_task_1_in',
+            'test_dataset_name': 'ustc_task_1_out',
+            'voting_threshold': 0.2  # 60%的层认为是OOD则判定为OOD
+            
+        },
+        {
+            'name':'模型1 混合',   
+            'nn_name': 'icarl_1',
+            'in_dataset_name': 'ustc_task_1_in',
+            'test_dataset_name': 'ustc_task_2_in',
+            'voting_threshold': 0.2  # 60%的层认为是OOD则判定为OOD
+            
+        },
+        {
+            'name':'模型2 内分布',   
+            'nn_name': 'icarl_2',
+            'in_dataset_name': 'ustc_task_2_in',
+            'test_dataset_name': 'ustc_task_2_in',
+            'voting_threshold': 0.4  # 60%的层认为是OOD则判定为OOD
+            
+        },
+        {
+            'name':'模型2 外分布',   
+            'nn_name': 'icarl_2',
+            'in_dataset_name': 'ustc_task_2_in',
+            'test_dataset_name': 'ustc_task_2_out',
+            'voting_threshold': 0.4  # 60%的层认为是OOD则判定为OOD
+            
+        },
+        {
+            'name':'模型2 混合',   
+            'nn_name': 'icarl_2',
+            'in_dataset_name': 'ustc_task_2_in',
+            'test_dataset_name': 'ustc_task_3_in',
+            'voting_threshold': 0.4  # 60%的层认为是OOD则判定为OOD
+            
+        },
+    ]
+    
+    # 固定参数
+common_params = {
+        'batch_size': 64,
+        'gpu': 0,
+        'use_multi_centroid': True,
+        'num_layers': 5,
+    }
 
 def detect_ood_multi_layer_voting(
     nn_name,
@@ -171,95 +254,82 @@ def analyze_voting_performance(results, num_layers):
         'unanimous_in': unanimous_in,
         'unanimous_ratio': unanimous_ratio
     }
+def detect_ood_regression(
+    nn_name,
+    in_dataset_name,
+    test_dataset_name,
+    eps=0.0,
+    batch_size=64,
+    gpu=None,
+    use_multi_centroid=False,
+    threshold_percentile=95,  # 每层的阈值百分位数
+    voting_threshold=0.5,     # 投票阈值：多少比例的层认为是OOD才判定为OOD
+    num_layers=5,
+    name='',
+):
+    """
+    多层投票OOD检测：每层独立判断，多数投票决定最终结果
+    """
+    print("开始多层投票OOD检测...")
+    
+    # 1. 加载模型和计算统计量
+    model = dl.load_pre_trained_nn(nn_name, gpu)
+    model.eval()
+    
+    num_classes = dl.get_num_classes(in_dataset_name)
+    single_means, inverse, _, multi_means = hidden_feature_estimator(
+        nn_name, in_dataset_name, batch_size, gpu, True, max_clusters=5
+    )
+    ood_sample_mean, ood_inverse, _ = hidden_feature_estimator_ood(
+        nn_name, test_dataset_name, batch_size=10, gpu=gpu
+    )
+    
+    sample_mean = multi_means if use_multi_centroid else single_means
 
-def main():
+    # 2. 计算分布内数据的马氏距离（用于确定各层阈值）
+    print("计算分布内数据以确定各层阈值...")
+    in_dataloader = dl.train_dataloader(in_dataset_name, in_dataset_name, batch_size=batch_size)
+    
+    in_scores = get_enhanced_mahalanobis_score(
+        model, in_dataloader, sample_mean, inverse, ood_sample_mean, ood_inverse,
+        num_classes, nn_name, num_layers, eps, gpu, False, use_multi_centroid
+    )
+    
+    
+    # 4. 计算测试数据的马氏距离
+    print("计算测试数据的马氏距离...")
+    test_dataloader = dl.test_dataloader(test_dataset_name, in_dataset_name, batch_size=batch_size)
+    
+    test_scores = get_enhanced_mahalanobis_score(
+        model, test_dataloader, sample_mean, inverse, ood_sample_mean, ood_inverse,
+        num_classes, nn_name, num_layers, eps, gpu, False, use_multi_centroid
+    )
+    
+    classifier = WeightRegression()
+    s_in,s_test = classifier(in_scores, test_scores)
+    (
+        fpr_at_tpr_in,
+        fpr_at_tpr_out,
+        detection,
+        auroc,
+        aupr_in,
+        aupr_out,
+    ) = em.print_metrics_and_info(
+        s_in,
+        s_test,
+        nn_name,
+        nn_name + '_' + in_dataset_name+'_'+test_dataset_name,
+        test_dataset_name,
+        'detect_ood',
+        True,
+        False,
+        True,
+    )
+
+def main_multi_layer_voting():
     """
     主函数：执行多层投票OOD检测
     """
-    # 测试配置
-    test_configurations = [
-        {
-            'name': '模型0 内分布',
-            'nn_name': 'icarl_0',
-            'in_dataset_name': 'ustc_task_0_in',
-            'test_dataset_name': 'ustc_task_0_in',
-            'voting_threshold': 0.2  # 60%的层认为是OOD则判定为OOD
-            
-        },
-        {
-            'name': '模型0 外分布',
-            'nn_name': 'icarl_0',
-            'in_dataset_name': 'ustc_task_0_in',
-            'test_dataset_name': 'ustc_task_0_out',
-            'voting_threshold': 0.2  # 60%的层认为是OOD则判定为OOD
-            
-        },
-        {
-            'name': '模型0 混合',
-            'nn_name': 'icarl_0',
-            'in_dataset_name': 'ustc_task_0_in',
-            'test_dataset_name': 'ustc_task_1_in',
-            'voting_threshold': 0.2  # 60%的层认为是OOD则判定为OOD
-            
-        },
-        {
-            'name':'模型1 内分布',   
-            'nn_name': 'icarl_1',
-            'in_dataset_name': 'ustc_task_1_in',
-            'test_dataset_name': 'ustc_task_1_in',
-            'voting_threshold': 0.2  # 60%的层认为是OOD则判定为OOD
-            
-        },
-        {
-            'name':'模型1 外分布',   
-            'nn_name': 'icarl_1',
-            'in_dataset_name': 'ustc_task_1_in',
-            'test_dataset_name': 'ustc_task_1_out',
-            'voting_threshold': 0.2  # 60%的层认为是OOD则判定为OOD
-            
-        },
-        {
-            'name':'模型1 混合',   
-            'nn_name': 'icarl_1',
-            'in_dataset_name': 'ustc_task_1_in',
-            'test_dataset_name': 'ustc_task_2_in',
-            'voting_threshold': 0.2  # 60%的层认为是OOD则判定为OOD
-            
-        },
-        {
-            'name':'模型2 内分布',   
-            'nn_name': 'icarl_2',
-            'in_dataset_name': 'ustc_task_2_in',
-            'test_dataset_name': 'ustc_task_2_in',
-            'voting_threshold': 0.4  # 60%的层认为是OOD则判定为OOD
-            
-        },
-        {
-            'name':'模型2 外分布',   
-            'nn_name': 'icarl_2',
-            'in_dataset_name': 'ustc_task_2_in',
-            'test_dataset_name': 'ustc_task_2_out',
-            'voting_threshold': 0.4  # 60%的层认为是OOD则判定为OOD
-            
-        },
-        {
-            'name':'模型2 混合',   
-            'nn_name': 'icarl_2',
-            'in_dataset_name': 'ustc_task_2_in',
-            'test_dataset_name': 'ustc_task_3_in',
-            'voting_threshold': 0.4  # 60%的层认为是OOD则判定为OOD
-            
-        },
-    ]
-    
-    # 固定参数
-    common_params = {
-        'batch_size': 64,
-        'gpu': 0,
-        'use_multi_centroid': True,
-        'num_layers': 5,
-    }
-    
     print("开始多层投票OOD检测实验...")
     print("=" * 60)
     
@@ -319,8 +389,26 @@ def main():
     
     return all_results
 
-
+def main_regression():
+    """
+    主函数：执行回归OOD检测
+    """
+    print("开始回归OOD检测实验...")
+    print("=" * 60)
+    for config in test_configurations[1::3]:
+        print(f"\n测试: {config['name']}")
+        print("-" * 40)
+        
+        # 合并参数
+        params = {**common_params, **config}
+        
+        # 执行检测
+        detect_ood_regression(**params)
+        
+            
+    
 
 if __name__ == "__main__":
-    results = main()
+    # results = main_multi_layer_voting()
+    main_regression()
     
