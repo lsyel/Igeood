@@ -332,6 +332,11 @@ def load_test_dataset(name, transform_dataset, transform=transform_statistics):
             "{}/datasets/ustc_task_2_out/test".format(ROOT),
             transform=test_cil_survey_transform(),
         )
+    elif name.upper() == "USTC_TASK_3_IN":
+        dataset=  torchvision.datasets.ImageFolder(
+            "{}/datasets/ustc_task_3_in/test".format(ROOT),
+            transform=test_cil_survey_transform(),
+        )
     else:
         dataset= torchvision.datasets.ImageFolder(
             "{}/datasets/{}".format(ROOT, name),

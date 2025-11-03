@@ -30,7 +30,7 @@ class MeanScore(EnsembleMethod):
 class WeightRegression(EnsembleMethod):
     def __init__(
         self,
-        verbose=False,
+        verbose=True,
         ignore_dim=0,
         split_size=1000,
         regressor=LogisticRegressionCV,
