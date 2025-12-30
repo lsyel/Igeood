@@ -152,7 +152,18 @@ def main(
         else:
             val_scores = fm.load_score_file(
                 nn_name, val_dataset_name, val_filename)
-
+    #inscoress 和 outscores 数量保持一致,都取最小值
+    print("original in_scores shape: ", in_scores.shape)
+    print("original out_scores shape: ", out_scores.shape)
+    # in_scores = in_scores[:out_scores.shape[0]]
+    count_min = min(in_scores.shape[0], out_scores.shape[0])
+    #in_scores随机保留和out_scores数量一致
+    np.random.seed(42)  # 固定种子
+    in_scores = in_scores[np.random.choice(in_scores.shape[0], count_min, replace=False)]
+    #out_scores随机保留和in_scores数量一致
+    out_scores = out_scores[np.random.choice(out_scores.shape[0], count_min, replace=False)]
+    print("in_scores shape: ", in_scores.shape)
+    print("out_scores shape: ", out_scores.shape)
     # Ensemble method
     # length = min(len(in_scores), len(out_scores))
     combine_in_score, combine_out_score = ensemble_method(
@@ -258,7 +269,7 @@ def igeoodwb_score(
     # 当统计量不存在或需要重写时重新计算
     if cov_matrix_in is None or sample_mean_in is None or rewrite:
         hidden_feature_estimator(
-            nn_name, in_dataset_name, batch_size, gpu, True, True, None)
+            nn_name, in_dataset_name, batch_size, gpu, True, True, None,max_clusters =1)
         # 重新加载生成的统计量
         cov_matrix_in = dl.load_hidden_features_cov(
             nn_name, in_dataset_name, True, None, per_class=per_class)
@@ -275,8 +286,9 @@ def igeoodwb_score(
             cov_val_dataset_name = cov_mat_ood + nn_name
             cap = None  # 不使用采样上限
         else:
-            cap = 3000  # 常规OOD数据集采样上限
+            cap = 0  # 常规OOD数据集采样上限
             cov_val_dataset_name = cov_mat_ood
+            print("cap等于",cap)
 
         logger.info(f"加载OOD协方差矩阵: {cov_val_dataset_name}")
         cov_matrix_out = dl.load_hidden_features_cov(
@@ -285,7 +297,7 @@ def igeoodwb_score(
         # 需要重新生成时调用特征估计器
         if cov_matrix_out is None or rewrite:
             hidden_feature_estimator(
-                nn_name, cov_val_dataset_name, batch_size, gpu, False, True, cap)
+                nn_name, cov_val_dataset_name, batch_size, gpu, False, True, cap,extend_batch_size=10)
             cov_matrix_out = dl.load_hidden_features_cov(
                 nn_name, cov_val_dataset_name, True, cap)
 
@@ -341,7 +353,7 @@ def igeoodwb(
     centroid_logits=None,
     multi_sample_mean_in=None,
     distance=fr_distance_multivariate_gaussian,
-    last_layers=-1  # 新增参数，控制层选择策略
+    last_layers=1  # 新增参数，控制层选择策略
 ):
     """IGEOOD核心检测算法实现
 
@@ -455,8 +467,10 @@ def igeoodwb(
                     )
 
                 # 取最小距离作为当前层分数
-                score1, _ = torch.min(score1, dim=1)
-                score1 = score1.detach().cpu().numpy().reshape(-1, 1)
+                score1_max, _ = torch.max(score1, dim=1)
+                score1_max = score1_max.detach().cpu().numpy().reshape(-1, 1)
+                score1_min, _ = torch.min(score1, dim=1)
+                score1_min = score1_min.detach().cpu().numpy().reshape(-1, 1)
 
                 # OOD协方差矩阵处理（生成对比分数）
                 if cov_mat_out is not None:
@@ -464,14 +478,17 @@ def igeoodwb(
                         out_feature, sample_mean_out, cov_mat_in, cov_mat_out,
                         layer_idx, num_classes, distance=distance
                     )
-                    score2, _ = torch.min(score2, dim=1)
-                    score2 = score2.detach().cpu().numpy().reshape(-1, 1)
+                    score2_max, _ = torch.max(score2, dim=1)
+                    score2_max = score2_max.detach().cpu().numpy().reshape(-1, 1)
+                    score2_min, _ = torch.min(score2, dim=1)
+                    score2_min = score2_min.detach().cpu().numpy().reshape(-1, 1)
                     
                     # 合并两种分数
-                    layer_scores = np.hstack([score1, score2])
+                    layer_scores = np.hstack([score1_max, score2_max,score1_min,score2_min])
                     igeoodfeature_scores[layer_idx].append(layer_scores)
                 else:
-                    igeoodfeature_scores[layer_idx].append(score1)
+                    layer_scores = np.hstack([score1_max, score1_min])
+                    igeoodfeature_scores[layer_idx].append(layer_scores)
 
         # === 进度记录 ===
         if batch_idx % (int(length / 10) + 1) == 0 and batch_idx > 0:

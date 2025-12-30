@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
@@ -53,7 +54,7 @@ def main(
         logger.info("使用单质心模式")
         sample_mean = single_means
     filename = "{}{}_{:.4f}.txt".format(prefix, mat_type, eps)
-
+    start_time = time.time()
     # Get in scores
     f = fm.find_score_file(nn_name, in_dataset_name, filename)
     if rewrite is True or f is None:
@@ -117,9 +118,20 @@ def main(
         fw.close()
     else:
         out_score = fm.load_score_file(nn_name, out_dataset_name, filename)
+    end_time = time.time()
+    avg_time = (end_time - start_time) / (in_score.shape[0] + out_score.shape[0])
+    logger.info("平均每个样本计算时间: {:.6f} 秒".format(avg_time))
     #inscore 和 outscore 数量保持一致,都取最小值
-    in_score = in_score[:out_score.shape[0]]
-    out_score = out_score[:in_score.shape[0]]
+    print("original in_score shape: ", in_score.shape)
+    print("original out_score shape: ", out_score.shape)
+    # in_score = in_score[:out_score.shape[0]]
+    count_min = min(in_score.shape[0], out_score.shape[0])
+    #in_score随机保留和out_score数量一致
+    in_score = in_score[np.random.choice(in_score.shape[0], count_min, replace=False)]
+    #out_score随机保留和in_score数量一致
+    out_score = out_score[np.random.choice(out_score.shape[0], count_min, replace=False)]
+    print("in_score shape: ", in_score.shape)
+    print("out_score shape: ", out_score.shape)
     # Validation data
     ensemble_name = ensemble_method.__name__
     if "val" in ensemble_method.__name__:
@@ -299,7 +311,7 @@ def get_enhanced_mahalanobis_layer_score(
         if use_ood:
             combined_score = np.hstack([id_score_max, id_score_min,ood_score])
         else:
-            combined_score = np.hstack([id_score_min,id_score_max])
+            combined_score = np.hstack([id_score_max, id_score_min])
         if eps > 0:
             # Input_processing in the direction of the predicted class
             sample_pred = id_score.max(1)[1]

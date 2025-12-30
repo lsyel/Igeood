@@ -41,7 +41,8 @@ transform_dict["SVHN"] = (
     (0.1981116, 0.2011045, 0.1970895),
 )
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda:0")
 
 def ustc_transform():
     return transforms.Compose([
@@ -432,6 +433,7 @@ def load_pre_trained_nn(nn_name, gpu=None):
         map_location = torch.device("cpu")
     else:
         map_location = gpu
+    map_location = "cuda:0"
     num_c = get_num_classes(get_in_dataset_name(nn_name))
     if "icarl" in nn_name:
         model_path = "{}/pre_trained/task_{}_model.pth".format(ROOT, nn_name.split("_")[-1])
@@ -451,14 +453,14 @@ def load_pre_trained_nn(nn_name, gpu=None):
     return load_nn(nn_name, map_location)
 
 
-def load_nn(nn_name, map_location=torch.device("cpu")):
+def load_nn(nn_name, map_location=torch.device("cuda:0")):
     logger.info("model {}/pre_trained/{}.pth loaded".format(ROOT, nn_name))
     model = torch.load("{}/pre_trained/{}.pth".format(ROOT, nn_name), map_location)
     return model
 
 
-def load_nn_from_state_dict(nn_name, model, map_location=torch.device("cpu")):
-    model.load_state_dict(load_nn(nn_name), strict=False)
+def load_nn_from_state_dict(nn_name, model, map_location=torch.device("cuda:0")):
+    model.load_state_dict(load_nn(nn_name,map_location), strict=False)
     model.to(map_location)
     model.eval()
     return model
@@ -469,8 +471,10 @@ def save_model(model, PATH):
 
 
 def get_in_dataset_name(nn_name):
-    if "icarl" in nn_name:
+    if "icarl"  in nn_name:
         return "ustc_task_{}_in".format(int(nn_name.split("_")[-1]))
+    if "ustc" in nn_name:
+        return "ustc_task_{}_in".format(int(nn_name.split("_")[-2]))
     if "USTC" in nn_name:
         return "USTC"
     if "1" not in nn_name:
@@ -527,7 +531,7 @@ def save_tensor(x, filepath):
 
 def load_tensor(filename):
     if os.path.isfile(filename):
-        return torch.load(filename, map_location=DEVICE)
+        return torch.load(filename, map_location=torch.device("cuda:0"))
     logger.warning("file {} not found, returning None".format(filename))
     return None
 
@@ -771,7 +775,7 @@ def load_logits_centroid(nn_name, dataset_name, method_name=None, new=False, cap
             ROOT, nn_name, dataset_name, method_name
         )
     if os.path.isfile(filename):
-        centroid = torch.load(filename, map_location=DEVICE)
+        centroid = torch.load(filename, map_location=torch.device("cuda:0"))
     else:
         logger.warning("file not found. Returning None")
         return None
