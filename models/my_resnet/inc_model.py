@@ -40,35 +40,64 @@ class IncModel:
         logger.addHandler(console_handler)
     
     def _load_model(self, model_path, num_classes):
-        self.logger.info(f"开始加载模型: {model_path}")
-        checkpoint = torch.load(model_path, map_location=self.device)
-        moe_experts = checkpoint.get('moe_experts', 1)  # 默认为1
+            self.logger.info(f"开始加载模型: {model_path}")
+            # 1. 加载 checkpoint 字典
+            checkpoint = torch.load(model_path, map_location=self.device)
+            moe_experts = checkpoint.get('moe_experts', 1)  # 默认为1
 
-        # 使用检测到的专家数量初始化模型
-        model = IncrementalNet(num_classes, use_moe=True, moe_experts=moe_experts)
-        
-        # 加载主网络参数
-        model.load_state_dict(checkpoint['network_state_dict'])
-        self.logger.info("主网络参数加载成功")
-        
-        
-        
-        # 恢复其他状态
-        model._total_classes = checkpoint['total_classes']
-        model._known_classes = checkpoint['known_classes']
-        model._cur_task = checkpoint['cur_task']
-        model._data_memory = checkpoint['data_memory']
-        model._targets_memory = checkpoint['targets_memory']
-        
-        model.to(self.device)
-        self.logger.info(f"模型已转移到设备: {self.device}")
-        
-        # 最终参数检查
-        # self.logger.info("\n最终模型参数:")
-        # self._print_model_params(model)
-        
-        self.logger.info("模型加载完成")
-        return model
+            # 2. 初始化模型 (此时 old_gate 的大小会错误地等于 moe_experts)
+            model = IncrementalNet(num_classes, use_moe=True, moe_experts=moe_experts)
+            
+            # ==================== 修复开始 ====================
+            # 3. 动态调整 old_gate 的结构以匹配 checkpoint
+            state_dict = checkpoint['network_state_dict']
+            
+            # 这里的 key 需要根据你的报错信息来，你的报错是 convnet.moe_layer.old_gate.8.weight
+            old_gate_weight_key = 'convnet.moe_layer.old_gate.8.weight'
+            
+            # 检查是否存在 old_gate 权重且使用了 MoE
+            if model.convnet.moe_layer is not None and old_gate_weight_key in state_dict:
+                # 获取 checkpoint 中 old_gate 的输出维度 (即旧专家数量)
+                saved_old_experts = state_dict[old_gate_weight_key].shape[0]
+                
+                # 获取当前初始化模型中 old_gate 的输出维度
+                # 注意：old_gate 是一个 Sequential，索引 8 是最后一层 Linear
+                current_old_experts = model.convnet.moe_layer.old_gate[8].out_features
+                
+                if saved_old_experts != current_old_experts:
+                    self.logger.info(f"检测到 old_gate 维度不匹配: Checkpoint={saved_old_experts}, Model={current_old_experts}")
+                    self.logger.info("正在重构 old_gate 以匹配 Checkpoint...")
+                    
+                    # 获取输入维度 (第一层的输入特征数)
+                    input_dim = model.convnet.moe_layer.gate[0].in_features
+                    
+                    # 使用 MoELayer 的内部方法重建 old_gate
+                    new_old_gate = model.convnet.moe_layer._build_gate_network(input_dim, saved_old_experts)
+                    
+                    # 替换模型中的 old_gate
+                    model.convnet.moe_layer.old_gate = new_old_gate
+                    model.convnet.moe_layer.old_num_experts = saved_old_experts
+                    
+                    # 必须将新层移动到正确的设备
+                    model.convnet.moe_layer.old_gate.to(self.device)
+            # ==================== 修复结束 ====================
+
+            # 4. 加载主网络参数
+            model.load_state_dict(checkpoint['network_state_dict'])
+            self.logger.info("主网络参数加载成功")
+            
+            # 恢复其他状态
+            model._total_classes = checkpoint['total_classes']
+            model._known_classes = checkpoint['known_classes']
+            model._cur_task = checkpoint['cur_task']
+            model._data_memory = checkpoint['data_memory']
+            model._targets_memory = checkpoint['targets_memory']
+            
+            model.to(self.device)
+            self.logger.info(f"模型已转移到设备: {self.device}")
+            
+            self.logger.info("模型加载完成")
+            return model
 
     def _print_model_params(self, model):
         """打印模型所有参数信息"""

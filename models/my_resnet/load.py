@@ -220,24 +220,24 @@ def main(args):
         logger.info(f"{task_class_labels[i]:<15} | {precision:.4f} | {recall:.4f} | {f1:.4f}")
 if __name__ == '__main__':
     args_list = [
-        {
-            'model_path': '/root/wzhdesign/Igeood/pre_trained/task_0_model.pth',
-            'num_classes': 5,
-            'dataset': 'ustc_task_0_in',
-            'transform': 'ustc_transform'
-        },
+        # {
+        #     'model_path': '/root/wzhdesign/Igeood/pre_trained/task_0_model.pth',
+        #     'num_classes': 5,
+        #     'dataset': 'ustc_task_0_in',
+        #     'transform': 'ustc_transform'
+        # },
         {
             'model_path': '/root/wzhdesign/Igeood/pre_trained/task_1_model.pth',
             'num_classes': 10,
             'dataset': 'ustc_task_1_in',
             'transform': 'ustc_transform'
         },
-        {
-            'model_path': '/root/wzhdesign/Igeood/pre_trained/task_2_model.pth',
-            'num_classes': 15,
-            'dataset': 'ustc_task_2_in',
-            'transform': 'ustc_transform'
-        },
+        # {
+        #     'model_path': '/root/wzhdesign/Igeood/pre_trained/task_2_model.pth',
+        #     'num_classes': 15,
+        #     'dataset': 'ustc_task_2_in',
+        #     'transform': 'ustc_transform'
+        # },
     ]
     for args in args_list:
         print(args)
