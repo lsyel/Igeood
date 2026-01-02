@@ -191,10 +191,9 @@ def hidden_feature_estimator(
     batch_size=512,
     gpu=None,
     train=True,
-    diag=True,
+    diag=False,
     cap=None,
     max_clusters=1,  # 新增聚类数
-    extend_batch_size=100,  # 新增扩展批量大小参数
     *args,
     **kwargs
 ):
@@ -226,8 +225,7 @@ def hidden_feature_estimator(
     else:
         # 测试时使用固定batch_size=100
         dataloader = dl.test_dataloader(
-            dataset_name, in_dataset_name, batch_size=extend_batch_size)
-        print("测试数据集：{}，批量大小：{}".format(dataset_name, extend_batch_size))
+            dataset_name, in_dataset_name, batch_size=100)
     # 加载预训练模型
     model = dl.load_pre_trained_nn(nn_name, gpu)
 
